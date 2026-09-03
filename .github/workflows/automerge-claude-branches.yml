@@ -1,0 +1,42 @@
+name: Auto-merge Claude branches
+
+on:
+  push:
+    branches:
+      - "claude/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    if: github.repository == 'hezumbu23/leadsnap'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fast-forward or merge claude/* branch into main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin main
+          git checkout main
+          git pull origin main
+
+          if git merge --no-edit "origin/${BRANCH}"; then
+            git push origin main
+          else
+            echo "Merge conflict between main and ${BRANCH} - aborting automerge."
+            git merge --abort
+            exit 1
+          fi

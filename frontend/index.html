@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
+<title>LeadSnap</title>
+<meta name="theme-color" content="#1e293b">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icons/favicon.svg">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <img src="icons/favicon.svg" alt="" class="brand-logo">
+    <span>LeadSnap</span>
+  </div>
+  <div class="count" id="contactCount">0 Kontakte</div>
+</header>
+
+<main id="mainView">
+
+  <section id="listView">
+    <div class="toolbar">
+      <input type="search" id="searchBox" placeholder="Suchen (Name, Firma, Thema)…">
+    </div>
+    <div id="emptyState" class="empty-state hidden">
+      <p>Noch keine Kontakte erfasst.</p>
+      <p>Tippe unten rechts auf <strong>+</strong>, um deinen ersten Kontakt aufzunehmen.</p>
+    </div>
+    <ul id="contactList" class="contact-list"></ul>
+  </section>
+
+  <section id="formView" class="hidden">
+    <form id="contactForm">
+      <div class="photo-section">
+        <label class="photo-capture" id="photoLabel">
+          <img id="photoPreview" class="hidden">
+          <span id="photoPlaceholder">📷<br>Visitenkarte fotografieren</span>
+          <input type="file" accept="image/*" capture="environment" id="photoInput">
+        </label>
+        <button type="button" id="retakeBtn" class="link-btn hidden">Neues Foto</button>
+      </div>
+
+      <div class="field-grid">
+        <div class="field">
+          <label>Name *</label>
+          <input type="text" id="f_name" autocomplete="off" required>
+        </div>
+        <div class="field">
+          <label>Firma</label>
+          <input type="text" id="f_company" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Position</label>
+          <input type="text" id="f_position" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Telefon</label>
+          <input type="tel" id="f_phone" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>E-Mail</label>
+          <input type="email" id="f_email" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Thema / Interesse</label>
+          <input type="text" id="f_topic" autocomplete="off" placeholder="z.B. Produkt X, Kooperation">
+        </div>
+        <div class="field full">
+          <label>Notizen</label>
+          <textarea id="f_notes" rows="3" placeholder="Kurze Notizen zum Gespräch…"></textarea>
+        </div>
+        <div class="field">
+          <label>Priorität</label>
+          <select id="f_priority">
+            <option value="normal">Normal</option>
+            <option value="hoch">🔥 Hoch – dringend nachfassen</option>
+            <option value="niedrig">Niedrig</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" id="cancelBtn" class="btn secondary">Abbrechen</button>
+        <button type="submit" class="btn primary">Speichern</button>
+      </div>
+    </form>
+  </section>
+
+  <section id="detailView" class="hidden">
+    <div id="detailContent"></div>
+    <div class="form-actions">
+      <button type="button" id="detailEditBtn" class="btn secondary">Bearbeiten</button>
+      <button type="button" id="detailDeleteBtn" class="btn danger">Löschen</button>
+    </div>
+  </section>
+
+  <section id="exportView" class="hidden">
+    <h2>Export</h2>
+    <p class="hint">Exportiere alle erfassten Kontakte am Ende der Messe.</p>
+    <button class="btn primary wide" id="exportCsvBtn">CSV exportieren (Excel)</button>
+    <button class="btn primary wide" id="exportVcfBtn">vCard exportieren (Kontakte-App)</button>
+    <button class="btn secondary wide" id="exportJsonBtn">JSON-Backup exportieren</button>
+    <hr>
+    <button class="btn danger wide" id="clearAllBtn">Alle Kontakte löschen</button>
+  </section>
+
+</main>
+
+<button id="fabAdd" class="fab" title="Neuer Kontakt">+</button>
+
+<nav class="bottomnav">
+  <button class="navbtn active" data-view="listView">📋<span>Liste</span></button>
+  <button class="navbtn" data-view="exportView">📤<span>Export</span></button>
+</nav>
+
+<div id="footer" class="deploy-footer"></div>
+
+<script src="app.js"></script>
+<script>
+fetch("/_manager/cgi-bin/app_status.py?name=leadsnap")
+  .then(r => r.json())
+  .then(s => {
+    if (s.commit_date) {
+      const d = new Date(s.commit_date).toLocaleString();
+      document.getElementById("footer").textContent = `${d} – "${s.commit_message}"`;
+    }
+  })
+  .catch(() => {});
+</script>
+</body>
+</html>
