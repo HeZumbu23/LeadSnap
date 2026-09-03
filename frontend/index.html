@@ -38,7 +38,10 @@
       <div class="photo-section">
         <label class="photo-capture" id="photoLabel">
           <img id="photoPreview" class="hidden">
-          <span id="photoPlaceholder">📷<br>Visitenkarte fotografieren</span>
+          <span id="photoPlaceholder">
+            <svg viewBox="0 0 24 24" class="icon icon-lg" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="14" r="3.5"/></svg>
+            <br>Visitenkarte fotografieren
+          </span>
           <input type="file" accept="image/*" capture="environment" id="photoInput">
         </label>
         <button type="button" id="retakeBtn" class="link-btn hidden">Neues Foto</button>
@@ -78,7 +81,7 @@
           <label>Priorität</label>
           <select id="f_priority">
             <option value="normal">Normal</option>
-            <option value="hoch">🔥 Hoch – dringend nachfassen</option>
+            <option value="hoch">★ Hoch – dringend nachfassen</option>
             <option value="niedrig">Niedrig</option>
           </select>
         </div>
@@ -111,11 +114,19 @@
 
 </main>
 
-<button id="fabAdd" class="fab" title="Neuer Kontakt">+</button>
+<button id="fabAdd" class="fab" title="Neuer Kontakt">
+  <svg viewBox="0 0 24 24" class="icon icon-lg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+</button>
 
 <nav class="bottomnav">
-  <button class="navbtn active" data-view="listView">📋<span>Liste</span></button>
-  <button class="navbtn" data-view="exportView">📤<span>Export</span></button>
+  <button class="navbtn active" data-view="listView">
+    <svg viewBox="0 0 24 24" class="icon" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M8 9h8M8 12.5h8M8 16h5"/></svg>
+    <span>Liste</span>
+  </button>
+  <button class="navbtn" data-view="exportView">
+    <svg viewBox="0 0 24 24" class="icon" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>
+    <span>Export</span>
+  </button>
 </nav>
 
 <div id="footer" class="deploy-footer"></div>

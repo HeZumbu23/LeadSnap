@@ -159,6 +159,14 @@ main{padding:12px 12px 90px 12px;max-width:640px;margin:0 auto;}
   .field-grid{display:grid;grid-template-columns:1fr 1fr;}
 }
 
+.icon{width:22px;height:22px;flex-shrink:0;}
+.icon-lg{width:34px;height:34px;}
+.navbtn .icon{margin-bottom:1px;}
+.fab .icon{width:26px;height:26px;}
+.photo-capture .icon{color:var(--text-dim);}
+.card-thumb-placeholder svg{width:26px;height:26px;color:var(--text-dim);}
+.priority-star{color:var(--warn);}
+
 .deploy-footer{
   text-align:center;font-size:0.7rem;color:var(--text-dim);
   padding:6px 0 84px 0;opacity:0.6;

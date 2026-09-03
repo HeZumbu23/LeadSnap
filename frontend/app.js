@@ -44,9 +44,13 @@
     renderList();
   }
 
+  const ICON_STAR = '<svg class="icon priority-star" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.9 6.1 6.6.7-4.9 4.6 1.3 6.6L12 17.3 6.1 20.5l1.3-6.6L2.5 9.3l6.6-.7z"/></svg>';
+  const ICON_ARROW_DOWN = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>';
+  const ICON_PERSON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>';
+
   function priorityFlag(p) {
-    if (p === "hoch") return "🔥";
-    if (p === "niedrig") return "🔽";
+    if (p === "hoch") return ICON_STAR;
+    if (p === "niedrig") return ICON_ARROW_DOWN;
     return "";
   }
 
@@ -85,7 +89,7 @@
 
       const thumbHtml = c.photo
         ? `<img class="card-thumb" src="${c.photo}" alt="">`
-        : `<div class="card-thumb-placeholder">👤</div>`;
+        : `<div class="card-thumb-placeholder">${ICON_PERSON}</div>`;
 
       const sub = [c.company, c.position].filter(Boolean).join(" · ");
 
@@ -219,7 +223,10 @@
       setTimeout(clearExtractStatus, 4000);
     } catch (err) {
       console.error(err);
-      setExtractStatus("error", "Automatische Erkennung fehlgeschlagen – bitte manuell eingeben.");
+      setExtractStatus(
+        "error",
+        `Automatische Erkennung fehlgeschlagen (${err.message}) – bitte manuell eingeben.`
+      );
     }
   }
 
