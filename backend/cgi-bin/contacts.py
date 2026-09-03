@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """LeadSnap contacts API: list / save / delete / export as JSON over CGI.
 
-Contacts belong to an event (Messe), identified by event_id. See
-events.py for creating/listing events.
+Contacts belong to an event (Messe), identified by event_id, and every
+row is additionally scoped to the authenticated tenant (Mandant) from
+the session cookie - see auth.py and ../lib/auth_lib.py.
 """
 import os
 import sys
@@ -14,6 +15,9 @@ import io
 from datetime import datetime, timezone
 from urllib.parse import parse_qs
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lib"))
+import auth_lib  # noqa: E402
+
 APP_NAME = "leadsnap"
 
 
@@ -24,21 +28,13 @@ def log(level, message):
     print(f"[{ts}] [{APP_NAME}] [{level}] {message}", file=sys.stderr, flush=True)
 
 
-def data_dir():
-    return os.environ.get("APP_DATA_DIR", ".")
-
-
-def db_path():
-    return os.path.join(data_dir(), "leadsnap.db")
-
-
 def get_db():
-    conn = sqlite3.connect(db_path())
-    conn.row_factory = sqlite3.Row
+    conn = auth_lib.get_db()
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS contacts (
             id TEXT PRIMARY KEY,
+            tenant_id TEXT,
             event_id TEXT,
             name TEXT,
             company TEXT,
@@ -59,6 +55,7 @@ def get_db():
     )
     existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(contacts)")}
     for col, coltype in (
+        ("tenant_id", "TEXT"),
         ("event_id", "TEXT"),
         ("address", "TEXT"),
         ("latitude", "REAL"),
@@ -78,6 +75,10 @@ def send(status, obj):
     print()
     sys.stdout.flush()
     sys.stdout.buffer.write(body)
+
+
+def send_auth_error():
+    send(401, {"ok": False, "error": "not authenticated"})
 
 
 def send_file(status, content_type, filename, body_bytes):
@@ -105,23 +106,33 @@ def read_json_body():
 
 
 def row_to_dict(row):
-    return {k: row[k] for k in row.keys()}
+    return {k: row[k] for k in row.keys() if k != "tenant_id"}
 
 
-def action_list(params):
+def event_belongs_to_tenant(conn, event_id, tenant_id):
+    row = conn.execute(
+        "SELECT id FROM events WHERE id=? AND tenant_id=?", (event_id, tenant_id)
+    ).fetchone()
+    return row is not None
+
+
+def action_list(tenant_id, params):
     event_id = params.get("event_id", [""])[0]
     conn = get_db()
     if event_id:
         rows = conn.execute(
-            "SELECT * FROM contacts WHERE event_id=? ORDER BY created_at DESC", (event_id,)
+            "SELECT * FROM contacts WHERE tenant_id=? AND event_id=? ORDER BY created_at DESC",
+            (tenant_id, event_id),
         ).fetchall()
     else:
-        rows = conn.execute("SELECT * FROM contacts ORDER BY created_at DESC").fetchall()
+        rows = conn.execute(
+            "SELECT * FROM contacts WHERE tenant_id=? ORDER BY created_at DESC", (tenant_id,)
+        ).fetchall()
     conn.close()
     send(200, {"ok": True, "contacts": [row_to_dict(r) for r in rows]})
 
 
-def action_save():
+def action_save(tenant_id):
     payload = read_json_body()
     name = (payload.get("name") or "").strip()
     event_id = (payload.get("event_id") or "").strip()
@@ -133,8 +144,15 @@ def action_save():
         return
 
     conn = get_db()
+    if not event_belongs_to_tenant(conn, event_id, tenant_id):
+        conn.close()
+        send(403, {"ok": False, "error": "event does not belong to this tenant"})
+        return
+
     contact_id = payload.get("id") or str(uuid.uuid4())
-    existing = conn.execute("SELECT id FROM contacts WHERE id=?", (contact_id,)).fetchone()
+    existing = conn.execute(
+        "SELECT id FROM contacts WHERE id=? AND tenant_id=?", (contact_id, tenant_id)
+    ).fetchone()
     created_at = payload.get("created_at") or datetime.now(timezone.utc).isoformat()
 
     def as_float(value):
@@ -145,6 +163,7 @@ def action_save():
 
     fields = (
         contact_id,
+        tenant_id,
         event_id,
         name,
         payload.get("company", ""),
@@ -166,15 +185,15 @@ def action_save():
         conn.execute(
             """UPDATE contacts SET event_id=?, name=?, company=?, position=?, phone=?, email=?,
                address=?, topic=?, notes=?, priority=?, photo=?, latitude=?, longitude=?,
-               location_accuracy=? WHERE id=?""",
-            fields[1:15] + (contact_id,),
+               location_accuracy=? WHERE id=? AND tenant_id=?""",
+            fields[2:16] + (contact_id, tenant_id),
         )
     else:
         conn.execute(
             """INSERT INTO contacts
-               (id, event_id, name, company, position, phone, email, address, topic, notes,
-                priority, photo, latitude, longitude, location_accuracy, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+               (id, tenant_id, event_id, name, company, position, phone, email, address, topic,
+                notes, priority, photo, latitude, longitude, location_accuracy, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             fields,
         )
     conn.commit()
@@ -183,49 +202,54 @@ def action_save():
     send(200, {"ok": True, "id": contact_id})
 
 
-def action_delete():
+def action_delete(tenant_id):
     payload = read_json_body()
     contact_id = payload.get("id")
     if not contact_id:
         send(400, {"ok": False, "error": "id is required"})
         return
     conn = get_db()
-    conn.execute("DELETE FROM contacts WHERE id=?", (contact_id,))
+    conn.execute("DELETE FROM contacts WHERE id=? AND tenant_id=?", (contact_id, tenant_id))
     conn.commit()
     conn.close()
     log("INFO", f"deleted contact {contact_id}")
     send(200, {"ok": True})
 
 
-def action_clear_all(params):
+def action_clear_all(tenant_id, params):
     event_id = params.get("event_id", [""])[0]
     conn = get_db()
     if event_id:
-        conn.execute("DELETE FROM contacts WHERE event_id=?", (event_id,))
+        conn.execute(
+            "DELETE FROM contacts WHERE tenant_id=? AND event_id=?", (tenant_id, event_id)
+        )
         log("WARN", f"cleared all contacts for event {event_id}")
     else:
-        conn.execute("DELETE FROM contacts")
-        log("WARN", "cleared all contacts (all events)")
+        conn.execute("DELETE FROM contacts WHERE tenant_id=?", (tenant_id,))
+        log("WARN", f"cleared all contacts for tenant {tenant_id}")
     conn.commit()
     conn.close()
     send(200, {"ok": True})
 
 
-def fetch_contacts_for_export(params):
+def fetch_contacts_for_export(tenant_id, params):
     event_id = params.get("event_id", [""])[0]
     conn = get_db()
     if event_id:
         rows = conn.execute(
-            "SELECT * FROM contacts WHERE event_id=? ORDER BY created_at DESC", (event_id,)
+            "SELECT * FROM contacts WHERE tenant_id=? AND event_id=? ORDER BY created_at DESC",
+            (tenant_id, event_id),
         ).fetchall()
     else:
-        rows = conn.execute("SELECT * FROM contacts ORDER BY created_at DESC").fetchall()
+        rows = conn.execute(
+            "SELECT * FROM contacts WHERE tenant_id=? ORDER BY created_at DESC", (tenant_id,)
+        ).fetchall()
     conn.close()
     return rows
 
 
-def action_export_csv(params):
-    rows = fetch_contacts_for_export(params)
+def action_export_csv(tenant_id, params):
+    rows = fetch_contacts_for_export(tenant_id, params)
     buf = io.StringIO()
     fieldnames = [
         "name", "company", "position", "phone", "email", "address",
@@ -244,8 +268,8 @@ def vcard_escape(value):
     return (value or "").replace("\\", "\\\\").replace(",", "\\,").replace(";", "\\;").replace("\n", "\\n")
 
 
-def action_export_vcf(params):
-    rows = fetch_contacts_for_export(params)
+def action_export_vcf(tenant_id, params):
+    rows = fetch_contacts_for_export(tenant_id, params)
     lines = []
     for r in rows:
         notes_parts = []
@@ -276,6 +300,12 @@ def action_export_vcf(params):
 
 
 def main():
+    session = auth_lib.current_session()
+    if not session:
+        send_auth_error()
+        return
+    tenant_id = session["tenant_id"]
+
     method = os.environ.get("REQUEST_METHOD", "GET")
     query = os.environ.get("QUERY_STRING", "")
     params = parse_qs(query)
@@ -283,17 +313,17 @@ def main():
 
     try:
         if action == "list":
-            action_list(params)
+            action_list(tenant_id, params)
         elif action == "save":
-            action_save()
+            action_save(tenant_id)
         elif action == "delete":
-            action_delete()
+            action_delete(tenant_id)
         elif action == "clear_all":
-            action_clear_all(params)
+            action_clear_all(tenant_id, params)
         elif action == "export_csv":
-            action_export_csv(params)
+            action_export_csv(tenant_id, params)
         elif action == "export_vcf":
-            action_export_vcf(params)
+            action_export_vcf(tenant_id, params)
         else:
             send(400, {"ok": False, "error": f"unknown action '{action}'"})
     except Exception as exc:  # noqa: BLE001

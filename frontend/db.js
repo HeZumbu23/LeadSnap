@@ -85,5 +85,17 @@ window.LeadSnapDB = (() => {
     return wrap(store.delete(seq));
   }
 
-  return { getAll, getAllByIndex, put, del, clearByEventId, addOutbox, getOutbox, deleteOutbox };
+  async function clearStore(storeName) {
+    const store = await tx(storeName, "readwrite");
+    return wrap(store.clear());
+  }
+
+  async function wipeAll() {
+    await Promise.all(["events", "contacts", "outbox"].map(clearStore));
+  }
+
+  return {
+    getAll, getAllByIndex, put, del, clearByEventId,
+    addOutbox, getOutbox, deleteOutbox, wipeAll,
+  };
 })();

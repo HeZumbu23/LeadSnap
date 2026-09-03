@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""LeadSnap events API: list / create / rename / archive trade-show events."""
+"""LeadSnap events API: list / create / rename / archive trade-show events.
+
+All data is scoped to the authenticated tenant (Mandant) from the
+session cookie - see auth.py and ../lib/auth_lib.py.
+"""
 import os
 import sys
 import json
@@ -7,6 +11,9 @@ import sqlite3
 import uuid
 from datetime import datetime, timezone
 from urllib.parse import parse_qs
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lib"))
+import auth_lib  # noqa: E402
 
 APP_NAME = "leadsnap"
 
@@ -16,21 +23,13 @@ def log(level, message):
     print(f"[{ts}] [{APP_NAME}] [{level}] {message}", file=sys.stderr, flush=True)
 
 
-def data_dir():
-    return os.environ.get("APP_DATA_DIR", ".")
-
-
-def db_path():
-    return os.path.join(data_dir(), "leadsnap.db")
-
-
 def get_db():
-    conn = sqlite3.connect(db_path())
-    conn.row_factory = sqlite3.Row
+    conn = auth_lib.get_db()
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS events (
             id TEXT PRIMARY KEY,
+            tenant_id TEXT,
             name TEXT,
             location TEXT,
             start_date TEXT,
@@ -40,6 +39,9 @@ def get_db():
         )
         """
     )
+    existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(events)")}
+    if "tenant_id" not in existing_cols:
+        conn.execute("ALTER TABLE events ADD COLUMN tenant_id TEXT")
     return conn
 
 
@@ -51,6 +53,10 @@ def send(status, obj):
     print()
     sys.stdout.flush()
     sys.stdout.buffer.write(body)
+
+
+def send_auth_error():
+    send(401, {"ok": False, "error": "not authenticated"})
 
 
 def read_json_body():
@@ -67,21 +73,22 @@ def read_json_body():
 
 
 def row_to_dict(row):
-    d = {k: row[k] for k in row.keys()}
+    d = {k: row[k] for k in row.keys() if k != "tenant_id"}
     d["archived"] = bool(d.get("archived"))
     return d
 
 
-def action_list():
+def action_list(tenant_id):
     conn = get_db()
     rows = conn.execute(
-        "SELECT * FROM events ORDER BY archived ASC, created_at DESC"
+        "SELECT * FROM events WHERE tenant_id=? ORDER BY archived ASC, created_at DESC",
+        (tenant_id,),
     ).fetchall()
     conn.close()
     send(200, {"ok": True, "events": [row_to_dict(r) for r in rows]})
 
 
-def action_create():
+def action_create(tenant_id):
     payload = read_json_body()
     name = (payload.get("name") or "").strip()
     if not name:
@@ -93,17 +100,20 @@ def action_create():
     # offline and immediately attach contacts to it; honor that id if given
     # so the local and server copies stay the same record.
     event_id = payload.get("id") or str(uuid.uuid4())
-    existing = conn.execute("SELECT id FROM events WHERE id=?", (event_id,)).fetchone()
+    existing = conn.execute(
+        "SELECT id FROM events WHERE id=? AND tenant_id=?", (event_id, tenant_id)
+    ).fetchone()
     if existing:
         conn.close()
         send(200, {"ok": True, "id": event_id})
         return
     created_at = payload.get("created_at") or datetime.now(timezone.utc).isoformat()
     conn.execute(
-        """INSERT INTO events (id, name, location, start_date, end_date, archived, created_at)
-           VALUES (?,?,?,?,?,0,?)""",
+        """INSERT INTO events (id, tenant_id, name, location, start_date, end_date, archived, created_at)
+           VALUES (?,?,?,?,?,?,0,?)""",
         (
             event_id,
+            tenant_id,
             name,
             payload.get("location", ""),
             payload.get("start_date", ""),
@@ -113,25 +123,27 @@ def action_create():
     )
     conn.commit()
     conn.close()
-    log("INFO", f"created event {event_id} ({name})")
+    log("INFO", f"created event {event_id} ({name}) for tenant {tenant_id}")
     send(200, {"ok": True, "id": event_id})
 
 
-def action_update():
+def action_update(tenant_id):
     payload = read_json_body()
     event_id = payload.get("id")
     if not event_id:
         send(400, {"ok": False, "error": "id is required"})
         return
     conn = get_db()
-    existing = conn.execute("SELECT id FROM events WHERE id=?", (event_id,)).fetchone()
+    existing = conn.execute(
+        "SELECT id FROM events WHERE id=? AND tenant_id=?", (event_id, tenant_id)
+    ).fetchone()
     if not existing:
         conn.close()
         send(404, {"ok": False, "error": "event not found"})
         return
     conn.execute(
         """UPDATE events SET name=?, location=?, start_date=?, end_date=?, archived=?
-           WHERE id=?""",
+           WHERE id=? AND tenant_id=?""",
         (
             (payload.get("name") or "").strip(),
             payload.get("location", ""),
@@ -139,6 +151,7 @@ def action_update():
             payload.get("end_date", ""),
             1 if payload.get("archived") else 0,
             event_id,
+            tenant_id,
         ),
     )
     conn.commit()
@@ -147,16 +160,18 @@ def action_update():
     send(200, {"ok": True})
 
 
-def action_delete():
+def action_delete(tenant_id):
     payload = read_json_body()
     event_id = payload.get("id")
     if not event_id:
         send(400, {"ok": False, "error": "id is required"})
         return
     conn = get_db()
-    conn.execute("DELETE FROM events WHERE id=?", (event_id,))
+    conn.execute("DELETE FROM events WHERE id=? AND tenant_id=?", (event_id, tenant_id))
     try:
-        conn.execute("DELETE FROM contacts WHERE event_id=?", (event_id,))
+        conn.execute(
+            "DELETE FROM contacts WHERE event_id=? AND tenant_id=?", (event_id, tenant_id)
+        )
     except sqlite3.OperationalError:
         pass  # contacts table not created yet - nothing to delete
     conn.commit()
@@ -166,6 +181,12 @@ def action_delete():
 
 
 def main():
+    session = auth_lib.current_session()
+    if not session:
+        send_auth_error()
+        return
+    tenant_id = session["tenant_id"]
+
     method = os.environ.get("REQUEST_METHOD", "GET")
     query = os.environ.get("QUERY_STRING", "")
     params = parse_qs(query)
@@ -173,13 +194,13 @@ def main():
 
     try:
         if action == "list":
-            action_list()
+            action_list(tenant_id)
         elif action == "create":
-            action_create()
+            action_create(tenant_id)
         elif action == "update":
-            action_update()
+            action_update(tenant_id)
         elif action == "delete":
-            action_delete()
+            action_delete(tenant_id)
         else:
             send(400, {"ok": False, "error": f"unknown action '{action}'"})
     except Exception as exc:  # noqa: BLE001

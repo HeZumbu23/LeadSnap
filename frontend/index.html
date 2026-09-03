@@ -9,16 +9,63 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="LeadSnap">
-<link rel="manifest" href="manifest.json?v=5">
-<link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=5">
-<link rel="apple-touch-icon" href="icons/icon-192.png?v=5">
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="manifest" href="manifest.json?v=6">
+<link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=6">
+<link rel="apple-touch-icon" href="icons/icon-192.png?v=6">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 
+<section id="authView" class="auth-view hidden">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <img src="icons/favicon.svg?v=6" alt="" class="brand-logo">
+      <span>LeadSnap</span>
+    </div>
+
+    <div class="auth-tabs">
+      <button type="button" class="auth-tab active" data-tab="login">Anmelden</button>
+      <button type="button" class="auth-tab" data-tab="register">Registrieren</button>
+    </div>
+
+    <form id="loginForm" class="auth-form">
+      <div class="field">
+        <label>E-Mail</label>
+        <input type="email" id="login_email" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label>Passwort</label>
+        <input type="password" id="login_password" autocomplete="current-password" required>
+      </div>
+      <div id="loginError" class="auth-error hidden"></div>
+      <button type="submit" class="btn primary wide">Anmelden</button>
+    </form>
+
+    <form id="registerForm" class="auth-form hidden">
+      <div class="field">
+        <label>Firma / Team *</label>
+        <input type="text" id="register_tenant" autocomplete="organization" required placeholder="z.B. Acme Vertrieb">
+      </div>
+      <div class="field">
+        <label>E-Mail *</label>
+        <input type="email" id="register_email" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label>Passwort * (mind. 8 Zeichen)</label>
+        <input type="password" id="register_password" autocomplete="new-password" required minlength="8">
+      </div>
+      <div id="registerError" class="auth-error hidden"></div>
+      <button type="submit" class="btn primary wide">Konto erstellen</button>
+    </form>
+
+    <p class="auth-hint">Jedes Team hat seinen eigenen, getrennten Datenbereich.</p>
+  </div>
+</section>
+
+<div id="appShell" class="hidden">
 <header class="topbar">
   <div class="brand">
-    <img src="icons/favicon.svg?v=5" alt="" class="brand-logo">
+    <img src="icons/favicon.svg?v=6" alt="" class="brand-logo">
     <span>LeadSnap</span>
   </div>
   <button id="eventSwitcher" class="event-switcher" title="Messe wechseln">
@@ -136,6 +183,9 @@
     <button class="btn secondary wide" id="exportJsonBtn">JSON-Backup exportieren</button>
     <hr>
     <button class="btn danger wide" id="clearAllBtn">Kontakte dieser Messe löschen</button>
+    <hr>
+    <p class="hint" id="accountHint"></p>
+    <button class="btn secondary wide" id="logoutBtn">Abmelden</button>
   </section>
 
   <section id="eventView" class="hidden">
@@ -194,9 +244,10 @@
 </nav>
 
 <div id="footer" class="deploy-footer"></div>
+</div>
 
-<script src="db.js?v=5"></script>
-<script src="app.js?v=5"></script>
+<script src="db.js?v=6"></script>
+<script src="app.js?v=6"></script>
 <script>
 fetch("/_manager/cgi-bin/app_status.py?name=leadsnap")
   .then(r => r.json())
@@ -210,7 +261,7 @@ fetch("/_manager/cgi-bin/app_status.py?name=leadsnap")
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js?v=5").catch((err) => {
+    navigator.serviceWorker.register("sw.js?v=6").catch((err) => {
       console.warn("Service worker registration failed:", err);
     });
   });

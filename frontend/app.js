@@ -4,7 +4,10 @@
   const API = "cgi-bin/contacts.py";
   const EVENTS_API = "cgi-bin/events.py";
   const EXTRACT_API = "cgi-bin/extract_card.py";
+  const AUTH_API = "cgi-bin/auth.py";
   const CURRENT_EVENT_KEY = "leadsnap_current_event_id";
+  const TENANT_KEY = "leadsnap_tenant_id";
+  const LAST_SESSION_KEY = "leadsnap_last_session";
   const DB = window.LeadSnapDB;
 
   const views = {
@@ -168,6 +171,11 @@
         // network unreachable - stop, keep item queued for the next attempt
         return;
       }
+      if (res && res.status === 401) {
+        // session expired - keep the change queued, it will flush after re-login
+        handleSessionExpired();
+        return;
+      }
       if (res && !res.ok && res.status < 500) {
         console.warn("Dropping invalid queued change", item, res.status);
       } else if (res && !res.ok) {
@@ -179,6 +187,10 @@
 
   async function pullFromServer() {
     const evRes = await fetch(`${EVENTS_API}?action=list`);
+    if (evRes.status === 401) {
+      handleSessionExpired();
+      return;
+    }
     if (evRes.ok) {
       const data = await evRes.json();
       for (const ev of data.events || []) {
@@ -187,6 +199,10 @@
     }
     if (currentEventId) {
       const cRes = await fetch(`${API}?action=list&event_id=${encodeURIComponent(currentEventId)}`);
+      if (cRes.status === 401) {
+        handleSessionExpired();
+        return;
+      }
       if (cRes.ok) {
         const data = await cRes.json();
         for (const c of data.contacts || []) {
@@ -194,6 +210,14 @@
         }
       }
     }
+  }
+
+  let sessionExpiredShown = false;
+  function handleSessionExpired() {
+    if (sessionExpiredShown) return;
+    sessionExpiredShown = true;
+    localStorage.removeItem(LAST_SESSION_KEY);
+    showAuth();
   }
 
   let syncPromise = null;
@@ -483,7 +507,10 @@
       document.getElementById("retakeBtn").classList.remove("hidden");
       if (!currentCapturedAt) currentCapturedAt = new Date().toISOString();
       if (!currentLocation) captureLocation();
+      // Don't block on the AI lookup - let the rep jump straight to the
+      // topic field while it runs in the background.
       extractCardData(currentPhoto);
+      document.getElementById("f_topic").focus();
     } catch (err) {
       alert("Foto konnte nicht verarbeitet werden.");
     }
@@ -809,11 +836,164 @@
     renderList(e.target.value);
   });
 
-  // ---- Init ----
-  (async () => {
+  // ---- Auth / multi-tenancy ----
+
+  async function authApi(action, options = {}) {
+    return fetch(`${AUTH_API}?action=${action}`, options);
+  }
+
+  async function fetchSession() {
+    // Distinguish "server said no" from "couldn't reach the server" - offline
+    // must NOT log the rep out, or the app would be unusable without a
+    // network connection despite everything being cached locally.
+    try {
+      const res = await authApi("me");
+      if (res.status === 401) return { ok: false, reason: "unauthenticated" };
+      if (!res.ok) return { ok: false, reason: "error" };
+      const data = await res.json();
+      return data.ok ? data : { ok: false, reason: "error" };
+    } catch (err) {
+      return { ok: false, reason: "network" };
+    }
+  }
+
+  function showAuth() {
+    document.getElementById("authView").classList.remove("hidden");
+    document.getElementById("appShell").classList.add("hidden");
+  }
+
+  function showApp() {
+    document.getElementById("authView").classList.add("hidden");
+    document.getElementById("appShell").classList.remove("hidden");
+  }
+
+  async function resetLocalTenantScopeIfNeeded(tenantId) {
+    const stored = localStorage.getItem(TENANT_KEY);
+    if (stored && stored !== tenantId) {
+      await DB.wipeAll();
+      localStorage.removeItem(CURRENT_EVENT_KEY);
+      currentEventId = "";
+      events = [];
+      contacts = [];
+    }
+    localStorage.setItem(TENANT_KEY, tenantId);
+  }
+
+  async function startApp(session) {
+    sessionExpiredShown = false;
+    localStorage.setItem(LAST_SESSION_KEY, JSON.stringify({
+      email: session.email, tenant_id: session.tenant_id, tenant_name: session.tenant_name,
+    }));
+    document.getElementById("accountHint").textContent =
+      `Angemeldet als ${session.email} (${session.tenant_name})`;
+    await resetLocalTenantScopeIfNeeded(session.tenant_id);
+    showApp();
     await refreshEvents();
     await refreshContacts();
     await updateSyncBar();
     syncNow();
+  }
+
+  document.querySelectorAll(".auth-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".auth-tab").forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      const which = tab.dataset.tab;
+      document.getElementById("loginForm").classList.toggle("hidden", which !== "login");
+      document.getElementById("registerForm").classList.toggle("hidden", which !== "register");
+    });
+  });
+
+  function showAuthError(elId, message) {
+    const el = document.getElementById(elId);
+    el.textContent = message;
+    el.classList.remove("hidden");
+  }
+
+  document.getElementById("loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    document.getElementById("loginError").classList.add("hidden");
+    const email = document.getElementById("login_email").value.trim();
+    const password = document.getElementById("login_password").value;
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    try {
+      const res = await authApi("login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      const session = await fetchSession();
+      if (session && session.ok) await startApp(session);
+    } catch (err) {
+      showAuthError("loginError", err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById("registerForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    document.getElementById("registerError").classList.add("hidden");
+    const tenant_name = document.getElementById("register_tenant").value.trim();
+    const email = document.getElementById("register_email").value.trim();
+    const password = document.getElementById("register_password").value;
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    try {
+      const res = await authApi("register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenant_name, email, password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      const session = await fetchSession();
+      if (session && session.ok) await startApp(session);
+    } catch (err) {
+      showAuthError("registerError", err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", async () => {
+    if (!confirm("Wirklich abmelden?")) return;
+    try {
+      await authApi("logout", { method: "POST" });
+    } catch (err) {
+      // ignore network errors on logout - still clear local state below
+    }
+    await DB.wipeAll();
+    localStorage.removeItem(CURRENT_EVENT_KEY);
+    localStorage.removeItem(TENANT_KEY);
+    localStorage.removeItem(LAST_SESSION_KEY);
+    currentEventId = "";
+    events = [];
+    contacts = [];
+    showAuth();
+  });
+
+  // ---- Init ----
+  (async () => {
+    const session = await fetchSession();
+    if (session.ok) {
+      await startApp(session);
+      return;
+    }
+    if (session.reason === "network") {
+      // Offline on launch: trust the last known session rather than locking
+      // the rep out of their already-synced local data.
+      const cached = localStorage.getItem(LAST_SESSION_KEY);
+      if (cached) {
+        await startApp(JSON.parse(cached));
+        return;
+      }
+    } else {
+      localStorage.removeItem(LAST_SESSION_KEY);
+    }
+    showAuth();
   })();
 })();

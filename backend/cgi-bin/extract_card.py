@@ -10,6 +10,9 @@ import urllib.request
 import urllib.error
 from datetime import datetime
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lib"))
+import auth_lib  # noqa: E402
+
 APP_NAME = "leadsnap"
 ANTHROPIC_VERSION = "2023-06-01"
 MODEL = "claude-haiku-4-5-20251001"
@@ -168,6 +171,9 @@ def action_extract():
 
 
 def main():
+    if not auth_lib.current_session():
+        send(401, {"ok": False, "error": "not authenticated"})
+        return
     method = os.environ.get("REQUEST_METHOD", "GET")
     if method != "POST":
         send(405, {"ok": False, "error": "POST required"})
