@@ -285,7 +285,7 @@
 
     list.innerHTML = "";
     if (filtered.length === 0) {
-      empty.classList.toggle("hidden", contacts.length !== 0);
+      empty.classList.toggle("hidden", contacts.length !== 0 || !currentEventId);
       if (contacts.length !== 0 && q) {
         const li = document.createElement("li");
         li.className = "empty-state";
@@ -338,10 +338,14 @@
   function captureLocation() {
     currentLocation = null;
     if (!("geolocation" in navigator)) {
-      setLocationStatus("Standort: nicht unterstützt");
+      setLocationStatus("📍 Standort: von diesem Browser nicht unterstützt");
       return;
     }
-    setLocationStatus("📍 Standort wird ermittelt…");
+    if (window.isSecureContext === false) {
+      setLocationStatus("📍 Standort benötigt eine sichere (HTTPS-)Verbindung");
+      return;
+    }
+    setLocationStatus("📍 Standort wird ermittelt… (Berechtigung ggf. im Browser bestätigen)");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         currentLocation = {
@@ -351,8 +355,14 @@
         };
         setLocationStatus(`📍 Standort erfasst (±${Math.round(pos.coords.accuracy)} m)`);
       },
-      () => {
-        setLocationStatus("📍 Standort nicht verfügbar");
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          setLocationStatus("📍 Standort-Zugriff verweigert – bitte in den Website-/Browser-Einstellungen für LeadSnap erlauben");
+        } else if (err.code === err.TIMEOUT) {
+          setLocationStatus("📍 Standort-Ermittlung hat zu lange gedauert");
+        } else {
+          setLocationStatus("📍 Standort nicht verfügbar");
+        }
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
     );
