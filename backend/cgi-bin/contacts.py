@@ -13,9 +13,10 @@ APP_NAME = "leadsnap"
 
 
 def log(level, message):
+    # stdout is the CGI response channel - all log levels must go to stderr
+    # or they corrupt the HTTP header block and Apache returns a bare 500.
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    stream = sys.stderr if level == "ERROR" else sys.stdout
-    print(f"[{ts}] [{APP_NAME}] [{level}] {message}", file=stream, flush=True)
+    print(f"[{ts}] [{APP_NAME}] [{level}] {message}", file=sys.stderr, flush=True)
 
 
 def data_dir():
