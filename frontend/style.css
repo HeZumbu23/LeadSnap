@@ -1,17 +1,17 @@
 :root{
-  --bg:#0f172a;
-  --surface:#1e293b;
-  --surface-2:#273449;
-  --border:#334155;
-  --text:#f1f5f9;
-  --text-dim:#94a3b8;
-  --accent:#38bdf8;
-  --accent-2:#0ea5e9;
-  --danger:#f87171;
-  --success:#4ade80;
-  --warn:#fbbf24;
+  --bg:#f4f7fb;
+  --surface:#ffffff;
+  --surface-2:#eef2f8;
+  --border:#dce3ee;
+  --text:#1e293b;
+  --text-dim:#64748b;
+  --accent:#0ea5e9;
+  --accent-2:#0284c7;
+  --danger:#e11d48;
+  --success:#16a34a;
+  --warn:#d97706;
   --radius:14px;
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 *{box-sizing:border-box;}
@@ -28,7 +28,7 @@ html,body{
   position:sticky;top:0;z-index:10;
   display:flex;align-items:center;justify-content:space-between;
   padding:14px 16px calc(10px + env(safe-area-inset-top)) 16px;
-  background:rgba(15,23,42,0.92);
+  background:rgba(255,255,255,0.92);
   backdrop-filter:blur(8px);
   border-bottom:1px solid var(--border);
 }
@@ -113,9 +113,9 @@ main{padding:12px 12px 90px 12px;max-width:640px;margin:0 auto;}
   flex:1;padding:14px;border-radius:12px;border:none;font-size:1rem;font-weight:600;
   cursor:pointer;
 }
-.btn.primary{background:var(--accent-2);color:#03202e;}
+.btn.primary{background:var(--accent-2);color:#ffffff;}
 .btn.secondary{background:var(--surface-2);color:var(--text);border:1px solid var(--border);}
-.btn.danger{background:rgba(248,113,113,0.15);color:var(--danger);border:1px solid rgba(248,113,113,0.4);}
+.btn.danger{background:rgba(225,29,72,0.08);color:var(--danger);border:1px solid rgba(225,29,72,0.3);}
 .btn.wide{flex:none;width:100%;margin-bottom:12px;}
 
 /* Detail */
@@ -135,15 +135,15 @@ main{padding:12px 12px 90px 12px;max-width:640px;margin:0 auto;}
 .fab{
   position:fixed;right:20px;bottom:calc(78px + env(safe-area-inset-bottom));
   width:60px;height:60px;border-radius:50%;
-  background:var(--accent-2);color:#03202e;font-size:2rem;font-weight:400;
-  border:none;box-shadow:0 6px 18px rgba(14,165,233,0.5);
+  background:var(--accent-2);color:#ffffff;font-size:2rem;font-weight:400;
+  border:none;box-shadow:0 6px 18px rgba(2,132,199,0.35);
   display:flex;align-items:center;justify-content:center;line-height:0;
   cursor:pointer;z-index:20;
 }
 
 .bottomnav{
   position:fixed;bottom:0;left:0;right:0;z-index:15;
-  display:flex;background:rgba(15,23,42,0.95);backdrop-filter:blur(8px);
+  display:flex;background:rgba(255,255,255,0.95);backdrop-filter:blur(8px);
   border-top:1px solid var(--border);
   padding-bottom:env(safe-area-inset-bottom);
 }
