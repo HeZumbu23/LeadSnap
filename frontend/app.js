@@ -2,6 +2,7 @@
   "use strict";
 
   const API = "cgi-bin/contacts.py";
+  const EXTRACT_API = "cgi-bin/extract_card.py";
 
   const views = {
     listView: document.getElementById("listView"),
@@ -173,6 +174,55 @@
     });
   }
 
+  function setExtractStatus(mode, text) {
+    const el = document.getElementById("extractStatus");
+    el.classList.remove("hidden", "error", "success");
+    if (mode === "loading") {
+      el.innerHTML = `<span class="spinner"></span><span>${text}</span>`;
+    } else {
+      if (mode) el.classList.add(mode);
+      el.textContent = text;
+    }
+  }
+
+  function clearExtractStatus() {
+    const el = document.getElementById("extractStatus");
+    el.classList.add("hidden");
+    el.textContent = "";
+  }
+
+  function fillIfEmpty(id, value) {
+    if (!value) return;
+    const el = document.getElementById(id);
+    if (!el.value.trim()) el.value = value;
+  }
+
+  async function extractCardData(photoDataUrl) {
+    setExtractStatus("loading", "Visitenkarte wird per KI ausgelesen…");
+    try {
+      const res = await fetch(`${EXTRACT_API}?action=extract`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photo: photoDataUrl }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      const f = data.fields || {};
+      fillIfEmpty("f_name", f.name);
+      fillIfEmpty("f_company", f.company);
+      fillIfEmpty("f_position", f.position);
+      fillIfEmpty("f_phone", f.phone);
+      fillIfEmpty("f_email", f.email);
+      setExtractStatus("success", "Daten erkannt – bitte prüfen.");
+      setTimeout(clearExtractStatus, 4000);
+    } catch (err) {
+      console.error(err);
+      setExtractStatus("error", "Automatische Erkennung fehlgeschlagen – bitte manuell eingeben.");
+    }
+  }
+
   document.getElementById("photoInput").addEventListener("change", async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -182,6 +232,7 @@
       document.getElementById("photoPreview").classList.remove("hidden");
       document.getElementById("photoPlaceholder").classList.add("hidden");
       document.getElementById("retakeBtn").classList.remove("hidden");
+      extractCardData(currentPhoto);
     } catch (err) {
       alert("Foto konnte nicht verarbeitet werden.");
     }
