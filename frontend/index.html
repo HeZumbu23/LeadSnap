@@ -9,26 +9,35 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="LeadSnap">
-<link rel="manifest" href="manifest.json?v=3">
-<link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=3">
-<link rel="apple-touch-icon" href="icons/icon-192.png?v=3">
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="manifest" href="manifest.json?v=4">
+<link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=4">
+<link rel="apple-touch-icon" href="icons/icon-192.png?v=4">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 
 <header class="topbar">
   <div class="brand">
-    <img src="icons/favicon.svg?v=3" alt="" class="brand-logo">
+    <img src="icons/favicon.svg?v=4" alt="" class="brand-logo">
     <span>LeadSnap</span>
   </div>
-  <div class="count" id="contactCount">0 Kontakte</div>
+  <button id="eventSwitcher" class="event-switcher" title="Messe wechseln">
+    <svg viewBox="0 0 24 24" class="icon" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/></svg>
+    <span id="currentEventName">Messe wählen</span>
+    <svg viewBox="0 0 24 24" class="icon icon-sm" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+  </button>
 </header>
 
 <main id="mainView">
 
   <section id="listView">
     <div class="toolbar">
+      <div class="count" id="contactCount">0 Kontakte</div>
       <input type="search" id="searchBox" placeholder="Suchen (Name, Firma, Thema)…">
+    </div>
+    <div id="noEventBanner" class="no-event-banner hidden">
+      <p>Noch keine Messe ausgewählt.</p>
+      <button type="button" class="btn primary" id="noEventCreateBtn">Erste Messe anlegen</button>
     </div>
     <div id="emptyState" class="empty-state hidden">
       <p>Noch keine Kontakte erfasst.</p>
@@ -108,12 +117,50 @@
 
   <section id="exportView" class="hidden">
     <h2>Export</h2>
-    <p class="hint">Exportiere alle erfassten Kontakte am Ende der Messe.</p>
+    <p class="hint">Exportiere die Kontakte von <strong id="exportEventName">–</strong>.</p>
     <button class="btn primary wide" id="exportCsvBtn">CSV exportieren (Excel)</button>
     <button class="btn primary wide" id="exportVcfBtn">vCard exportieren (Kontakte-App)</button>
     <button class="btn secondary wide" id="exportJsonBtn">JSON-Backup exportieren</button>
     <hr>
-    <button class="btn danger wide" id="clearAllBtn">Alle Kontakte löschen</button>
+    <button class="btn danger wide" id="clearAllBtn">Kontakte dieser Messe löschen</button>
+  </section>
+
+  <section id="eventView" class="hidden">
+    <div class="event-view-header">
+      <h2>Messen</h2>
+      <button type="button" id="eventCloseBtn" class="icon-btn" title="Schließen">
+        <svg viewBox="0 0 24 24" class="icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+
+    <ul id="eventList" class="event-list"></ul>
+
+    <button type="button" class="btn primary wide" id="addEventBtn">+ Neue Messe anlegen</button>
+
+    <form id="eventForm" class="hidden">
+      <div class="field">
+        <label>Name der Messe *</label>
+        <input type="text" id="ev_name" required placeholder="z.B. Hannover Messe 2026">
+      </div>
+      <div class="field">
+        <label>Ort</label>
+        <input type="text" id="ev_location" placeholder="z.B. Hannover">
+      </div>
+      <div class="field-grid">
+        <div class="field">
+          <label>Start</label>
+          <input type="date" id="ev_start">
+        </div>
+        <div class="field">
+          <label>Ende</label>
+          <input type="date" id="ev_end">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn secondary" id="eventFormCancelBtn">Abbrechen</button>
+        <button type="submit" class="btn primary">Speichern</button>
+      </div>
+    </form>
   </section>
 
 </main>
@@ -135,7 +182,7 @@
 
 <div id="footer" class="deploy-footer"></div>
 
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 <script>
 fetch("/_manager/cgi-bin/app_status.py?name=leadsnap")
   .then(r => r.json())
@@ -149,7 +196,7 @@ fetch("/_manager/cgi-bin/app_status.py?name=leadsnap")
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js?v=3").catch((err) => {
+    navigator.serviceWorker.register("sw.js?v=4").catch((err) => {
       console.warn("Service worker registration failed:", err);
     });
   });

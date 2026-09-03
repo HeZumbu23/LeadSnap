@@ -2,19 +2,48 @@
   "use strict";
 
   const API = "cgi-bin/contacts.py";
+  const EVENTS_API = "cgi-bin/events.py";
   const EXTRACT_API = "cgi-bin/extract_card.py";
+  const CURRENT_EVENT_KEY = "leadsnap_current_event_id";
 
   const views = {
     listView: document.getElementById("listView"),
     formView: document.getElementById("formView"),
     detailView: document.getElementById("detailView"),
     exportView: document.getElementById("exportView"),
+    eventView: document.getElementById("eventView"),
   };
 
   let contacts = [];
+  let events = [];
+  let currentEventId = localStorage.getItem(CURRENT_EVENT_KEY) || "";
   let editingId = null;
+  let editingEventId = null;
   let currentPhoto = "";
   let currentDetailId = null;
+
+  function currentEvent() {
+    return events.find((e) => e.id === currentEventId) || null;
+  }
+
+  function setCurrentEvent(id) {
+    currentEventId = id || "";
+    if (currentEventId) {
+      localStorage.setItem(CURRENT_EVENT_KEY, currentEventId);
+    } else {
+      localStorage.removeItem(CURRENT_EVENT_KEY);
+    }
+    updateEventUi();
+  }
+
+  function updateEventUi() {
+    const ev = currentEvent();
+    const name = ev ? ev.name : "Messe wählen";
+    document.getElementById("currentEventName").textContent = name;
+    document.getElementById("exportEventName").textContent = ev ? ev.name : "–";
+    document.getElementById("noEventBanner").classList.toggle("hidden", !!ev);
+    document.getElementById("fabAdd").classList.toggle("hidden", !ev);
+  }
 
   function showView(name) {
     Object.entries(views).forEach(([key, el]) => el.classList.toggle("hidden", key !== name));
@@ -23,8 +52,8 @@
     });
   }
 
-  async function api(action, options = {}) {
-    const res = await fetch(`${API}?action=${action}`, options);
+  async function api(action, options = {}, extraQuery = "") {
+    const res = await fetch(`${API}?action=${action}${extraQuery}`, options);
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       throw new Error(`API-Fehler (${res.status}): ${text}`);
@@ -32,9 +61,43 @@
     return res.json();
   }
 
-  async function loadContacts() {
+  async function eventsApi(action, options = {}) {
+    const res = await fetch(`${EVENTS_API}?action=${action}`, options);
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`API-Fehler (${res.status}): ${text}`);
+    }
+    return res.json();
+  }
+
+  async function loadEvents() {
     try {
-      const data = await api("list");
+      const data = await eventsApi("list");
+      events = data.events || [];
+    } catch (e) {
+      console.error(e);
+      alert("Messen konnten nicht geladen werden: " + e.message);
+      events = [];
+    }
+    if (currentEventId && !events.some((e) => e.id === currentEventId)) {
+      setCurrentEvent("");
+    }
+    if (!currentEventId) {
+      const firstActive = events.find((e) => !e.archived);
+      if (firstActive) setCurrentEvent(firstActive.id);
+    }
+    updateEventUi();
+    renderEventList();
+  }
+
+  async function loadContacts() {
+    if (!currentEventId) {
+      contacts = [];
+      renderList();
+      return;
+    }
+    try {
+      const data = await api("list", {}, `&event_id=${encodeURIComponent(currentEventId)}`);
       contacts = data.contacts || [];
     } catch (e) {
       console.error(e);
@@ -255,8 +318,13 @@
 
   document.getElementById("contactForm").addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (!currentEventId) {
+      alert("Bitte zuerst eine Messe auswählen.");
+      return;
+    }
     const payload = {
       id: editingId || undefined,
+      event_id: currentEventId,
       name: document.getElementById("f_name").value.trim(),
       company: document.getElementById("f_company").value.trim(),
       position: document.getElementById("f_position").value.trim(),
@@ -342,26 +410,203 @@
     a.remove();
   }
 
+  function slugify(name) {
+    return (name || "messe")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "messe";
+  }
+
+  function requireEvent() {
+    if (!currentEventId) {
+      alert("Bitte zuerst eine Messe auswählen.");
+      return false;
+    }
+    return true;
+  }
+
   document.getElementById("exportCsvBtn").addEventListener("click", () => {
-    downloadFrom(`${API}?action=export_csv`, "leadsnap-kontakte.csv");
+    if (!requireEvent()) return;
+    const slug = slugify(currentEvent()?.name);
+    downloadFrom(
+      `${API}?action=export_csv&event_id=${encodeURIComponent(currentEventId)}&filename=leadsnap-${slug}.csv`,
+      `leadsnap-${slug}.csv`
+    );
   });
   document.getElementById("exportVcfBtn").addEventListener("click", () => {
-    downloadFrom(`${API}?action=export_vcf`, "leadsnap-kontakte.vcf");
+    if (!requireEvent()) return;
+    const slug = slugify(currentEvent()?.name);
+    downloadFrom(
+      `${API}?action=export_vcf&event_id=${encodeURIComponent(currentEventId)}&filename=leadsnap-${slug}.vcf`,
+      `leadsnap-${slug}.vcf`
+    );
   });
   document.getElementById("exportJsonBtn").addEventListener("click", () => {
+    if (!requireEvent()) return;
+    const slug = slugify(currentEvent()?.name);
     const blob = new Blob([JSON.stringify(contacts, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    downloadFrom(url, "leadsnap-backup.json");
+    downloadFrom(url, `leadsnap-${slug}-backup.json`);
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   });
   document.getElementById("clearAllBtn").addEventListener("click", async () => {
-    if (!confirm("Wirklich ALLE Kontakte unwiderruflich löschen?")) return;
+    if (!requireEvent()) return;
+    if (!confirm(`Wirklich ALLE Kontakte von "${currentEvent()?.name}" unwiderruflich löschen?`)) return;
     try {
-      await api("clear_all", { method: "POST" });
+      await api("clear_all", { method: "POST" }, `&event_id=${encodeURIComponent(currentEventId)}`);
       await loadContacts();
     } catch (err) {
       alert("Fehler: " + err.message);
     }
+  });
+
+  // ---- Events (Messen) ----
+
+  function formatDateRange(ev) {
+    const parts = [];
+    if (ev.start_date) parts.push(ev.start_date);
+    if (ev.end_date && ev.end_date !== ev.start_date) parts.push(ev.end_date);
+    const range = parts.join(" – ");
+    return [ev.location, range].filter(Boolean).join(" · ");
+  }
+
+  function renderEventList() {
+    const list = document.getElementById("eventList");
+    list.innerHTML = "";
+    if (events.length === 0) {
+      const li = document.createElement("li");
+      li.className = "empty-state";
+      li.textContent = "Noch keine Messe angelegt.";
+      list.appendChild(li);
+      return;
+    }
+    events.forEach((ev) => {
+      const li = document.createElement("li");
+      li.className = "event-card" + (ev.id === currentEventId ? " active" : "") + (ev.archived ? " archived" : "");
+      const meta = formatDateRange(ev);
+      li.innerHTML = `
+        <div class="event-card-body">
+          <div class="event-card-name">${escapeHtml(ev.name)}</div>
+          ${meta ? `<div class="event-card-meta">${escapeHtml(meta)}</div>` : ""}
+        </div>
+        ${ev.id === currentEventId ? '<span class="active-badge">Aktiv</span>' : ""}
+        <div class="event-card-actions">
+          <button type="button" data-act="edit" title="Bearbeiten">
+            <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
+          </button>
+          <button type="button" data-act="archive" title="${ev.archived ? "Reaktivieren" : "Archivieren"}">
+            <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4"/></svg>
+          </button>
+          <button type="button" data-act="delete" title="Löschen">
+            <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>
+          </button>
+        </div>
+      `;
+      li.querySelector(".event-card-body").addEventListener("click", () => {
+        setCurrentEvent(ev.id);
+        loadContacts();
+        renderEventList();
+        showView("listView");
+      });
+      li.querySelector('[data-act="edit"]').addEventListener("click", (e) => {
+        e.stopPropagation();
+        openEventForm(ev);
+      });
+      li.querySelector('[data-act="archive"]').addEventListener("click", async (e) => {
+        e.stopPropagation();
+        try {
+          await eventsApi("update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...ev, archived: !ev.archived }),
+          });
+          await loadEvents();
+        } catch (err) {
+          alert("Fehler: " + err.message);
+        }
+      });
+      li.querySelector('[data-act="delete"]').addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (!confirm(`"${ev.name}" inklusive aller zugehörigen Kontakte wirklich löschen?`)) return;
+        try {
+          await eventsApi("delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: ev.id }),
+          });
+          await loadEvents();
+          if (currentEventId === ev.id || !currentEventId) {
+            await loadContacts();
+          }
+        } catch (err) {
+          alert("Fehler: " + err.message);
+        }
+      });
+      list.appendChild(li);
+    });
+  }
+
+  function openEventForm(ev = null) {
+    editingEventId = ev ? ev.id : null;
+    document.getElementById("eventForm").classList.remove("hidden");
+    document.getElementById("ev_name").value = ev ? ev.name : "";
+    document.getElementById("ev_location").value = ev ? ev.location || "" : "";
+    document.getElementById("ev_start").value = ev ? ev.start_date || "" : "";
+    document.getElementById("ev_end").value = ev ? ev.end_date || "" : "";
+    document.getElementById("ev_name").focus();
+  }
+
+  function closeEventForm() {
+    editingEventId = null;
+    document.getElementById("eventForm").classList.add("hidden");
+    document.getElementById("eventForm").reset();
+  }
+
+  document.getElementById("addEventBtn").addEventListener("click", () => openEventForm());
+  document.getElementById("eventFormCancelBtn").addEventListener("click", closeEventForm);
+
+  document.getElementById("eventForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = document.getElementById("ev_name").value.trim();
+    if (!name) return;
+    const payload = {
+      id: editingEventId || undefined,
+      name,
+      location: document.getElementById("ev_location").value.trim(),
+      start_date: document.getElementById("ev_start").value,
+      end_date: document.getElementById("ev_end").value,
+    };
+    try {
+      const action = editingEventId ? "update" : "create";
+      const body = editingEventId ? { ...payload, archived: false } : payload;
+      const result = await eventsApi(action, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      closeEventForm();
+      await loadEvents();
+      if (!editingEventId && result.id) {
+        setCurrentEvent(result.id);
+        await loadContacts();
+      }
+    } catch (err) {
+      alert("Speichern fehlgeschlagen: " + err.message);
+    }
+  });
+
+  document.getElementById("eventSwitcher").addEventListener("click", () => {
+    renderEventList();
+    showView("eventView");
+  });
+  document.getElementById("eventCloseBtn").addEventListener("click", () => {
+    closeEventForm();
+    showView("listView");
+  });
+  document.getElementById("noEventCreateBtn").addEventListener("click", () => {
+    renderEventList();
+    showView("eventView");
+    openEventForm();
   });
 
   // ---- Navigation ----
@@ -377,5 +622,8 @@
   });
 
   // ---- Init ----
-  loadContacts();
+  (async () => {
+    await loadEvents();
+    await loadContacts();
+  })();
 })();

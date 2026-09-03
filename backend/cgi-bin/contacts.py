@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""LeadSnap contacts API: list / save / delete / export as JSON over CGI."""
+"""LeadSnap contacts API: list / save / delete / export as JSON over CGI.
+
+Contacts belong to an event (Messe), identified by event_id. See
+events.py for creating/listing events.
+"""
 import os
 import sys
 import json
@@ -8,6 +12,7 @@ import uuid
 import csv
 import io
 from datetime import datetime, timezone
+from urllib.parse import parse_qs
 
 APP_NAME = "leadsnap"
 
@@ -34,6 +39,7 @@ def get_db():
         """
         CREATE TABLE IF NOT EXISTS contacts (
             id TEXT PRIMARY KEY,
+            event_id TEXT,
             name TEXT,
             company TEXT,
             position TEXT,
@@ -47,6 +53,9 @@ def get_db():
         )
         """
     )
+    existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(contacts)")}
+    if "event_id" not in existing_cols:
+        conn.execute("ALTER TABLE contacts ADD COLUMN event_id TEXT")
     return conn
 
 
@@ -61,9 +70,10 @@ def send(status, obj):
 
 
 def send_file(status, content_type, filename, body_bytes):
+    safe_filename = filename.replace('"', "")
     print(f"Status: {status}")
     print(f"Content-Type: {content_type}; charset=utf-8")
-    print(f'Content-Disposition: attachment; filename="{filename}"')
+    print(f'Content-Disposition: attachment; filename="{safe_filename}"')
     print(f"Content-Length: {len(body_bytes)}")
     print()
     sys.stdout.flush()
@@ -87,9 +97,15 @@ def row_to_dict(row):
     return {k: row[k] for k in row.keys()}
 
 
-def action_list():
+def action_list(params):
+    event_id = params.get("event_id", [""])[0]
     conn = get_db()
-    rows = conn.execute("SELECT * FROM contacts ORDER BY created_at DESC").fetchall()
+    if event_id:
+        rows = conn.execute(
+            "SELECT * FROM contacts WHERE event_id=? ORDER BY created_at DESC", (event_id,)
+        ).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM contacts ORDER BY created_at DESC").fetchall()
     conn.close()
     send(200, {"ok": True, "contacts": [row_to_dict(r) for r in rows]})
 
@@ -97,8 +113,12 @@ def action_list():
 def action_save():
     payload = read_json_body()
     name = (payload.get("name") or "").strip()
+    event_id = (payload.get("event_id") or "").strip()
     if not name:
         send(400, {"ok": False, "error": "name is required"})
+        return
+    if not event_id:
+        send(400, {"ok": False, "error": "event_id is required"})
         return
 
     conn = get_db()
@@ -108,6 +128,7 @@ def action_save():
 
     fields = (
         contact_id,
+        event_id,
         name,
         payload.get("company", ""),
         payload.get("position", ""),
@@ -122,20 +143,20 @@ def action_save():
 
     if existing:
         conn.execute(
-            """UPDATE contacts SET name=?, company=?, position=?, phone=?, email=?,
+            """UPDATE contacts SET event_id=?, name=?, company=?, position=?, phone=?, email=?,
                topic=?, notes=?, priority=?, photo=? WHERE id=?""",
-            fields[1:10] + (contact_id,),
+            fields[1:11] + (contact_id,),
         )
     else:
         conn.execute(
             """INSERT INTO contacts
-               (id, name, company, position, phone, email, topic, notes, priority, photo, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+               (id, event_id, name, company, position, phone, email, topic, notes, priority, photo, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             fields,
         )
     conn.commit()
     conn.close()
-    log("INFO", f"saved contact {contact_id} ({name})")
+    log("INFO", f"saved contact {contact_id} ({name}) for event {event_id}")
     send(200, {"ok": True, "id": contact_id})
 
 
@@ -153,19 +174,35 @@ def action_delete():
     send(200, {"ok": True})
 
 
-def action_clear_all():
+def action_clear_all(params):
+    event_id = params.get("event_id", [""])[0]
     conn = get_db()
-    conn.execute("DELETE FROM contacts")
+    if event_id:
+        conn.execute("DELETE FROM contacts WHERE event_id=?", (event_id,))
+        log("WARN", f"cleared all contacts for event {event_id}")
+    else:
+        conn.execute("DELETE FROM contacts")
+        log("WARN", "cleared all contacts (all events)")
     conn.commit()
     conn.close()
-    log("WARN", "cleared all contacts")
     send(200, {"ok": True})
 
 
-def action_export_csv():
+def fetch_contacts_for_export(params):
+    event_id = params.get("event_id", [""])[0]
     conn = get_db()
-    rows = conn.execute("SELECT * FROM contacts ORDER BY created_at DESC").fetchall()
+    if event_id:
+        rows = conn.execute(
+            "SELECT * FROM contacts WHERE event_id=? ORDER BY created_at DESC", (event_id,)
+        ).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM contacts ORDER BY created_at DESC").fetchall()
     conn.close()
+    return rows
+
+
+def action_export_csv(params):
+    rows = fetch_contacts_for_export(params)
     buf = io.StringIO()
     fieldnames = [
         "name", "company", "position", "phone", "email",
@@ -176,17 +213,16 @@ def action_export_csv():
     for r in rows:
         writer.writerow({k: r[k] for k in fieldnames})
     data = buf.getvalue().encode("utf-8-sig")
-    send_file(200, "text/csv", "leadsnap-kontakte.csv", data)
+    filename = params.get("filename", ["leadsnap-kontakte.csv"])[0]
+    send_file(200, "text/csv", filename, data)
 
 
 def vcard_escape(value):
     return (value or "").replace("\\", "\\\\").replace(",", "\\,").replace(";", "\\;").replace("\n", "\\n")
 
 
-def action_export_vcf():
-    conn = get_db()
-    rows = conn.execute("SELECT * FROM contacts ORDER BY created_at DESC").fetchall()
-    conn.close()
+def action_export_vcf(params):
+    rows = fetch_contacts_for_export(params)
     lines = []
     for r in rows:
         notes_parts = []
@@ -208,32 +244,29 @@ def action_export_vcf():
             lines.append(f"NOTE:{vcard_escape(note_text)}")
         lines.append("END:VCARD")
     data = ("\n".join(lines) + "\n").encode("utf-8")
-    send_file(200, "text/vcard", "leadsnap-kontakte.vcf", data)
+    filename = params.get("filename", ["leadsnap-kontakte.vcf"])[0]
+    send_file(200, "text/vcard", filename, data)
 
 
 def main():
     method = os.environ.get("REQUEST_METHOD", "GET")
     query = os.environ.get("QUERY_STRING", "")
-    params = {}
-    for part in query.split("&"):
-        if "=" in part:
-            k, v = part.split("=", 1)
-            params[k] = v
-    action = params.get("action", "list" if method == "GET" else "")
+    params = parse_qs(query)
+    action = params.get("action", ["list" if method == "GET" else ""])[0]
 
     try:
         if action == "list":
-            action_list()
+            action_list(params)
         elif action == "save":
             action_save()
         elif action == "delete":
             action_delete()
         elif action == "clear_all":
-            action_clear_all()
+            action_clear_all(params)
         elif action == "export_csv":
-            action_export_csv()
+            action_export_csv(params)
         elif action == "export_vcf":
-            action_export_vcf()
+            action_export_vcf(params)
         else:
             send(400, {"ok": False, "error": f"unknown action '{action}'"})
     except Exception as exc:  # noqa: BLE001
