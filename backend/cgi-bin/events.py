@@ -89,8 +89,16 @@ def action_create():
         return
 
     conn = get_db()
-    event_id = str(uuid.uuid4())
-    created_at = datetime.now(timezone.utc).isoformat()
+    # Client generates the id up front so it can create an event while
+    # offline and immediately attach contacts to it; honor that id if given
+    # so the local and server copies stay the same record.
+    event_id = payload.get("id") or str(uuid.uuid4())
+    existing = conn.execute("SELECT id FROM events WHERE id=?", (event_id,)).fetchone()
+    if existing:
+        conn.close()
+        send(200, {"ok": True, "id": event_id})
+        return
+    created_at = payload.get("created_at") or datetime.now(timezone.utc).isoformat()
     conn.execute(
         """INSERT INTO events (id, name, location, start_date, end_date, archived, created_at)
            VALUES (?,?,?,?,?,0,?)""",

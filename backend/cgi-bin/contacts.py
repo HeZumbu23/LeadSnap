@@ -45,17 +45,28 @@ def get_db():
             position TEXT,
             phone TEXT,
             email TEXT,
+            address TEXT,
             topic TEXT,
             notes TEXT,
             priority TEXT,
             photo TEXT,
+            latitude REAL,
+            longitude REAL,
+            location_accuracy REAL,
             created_at TEXT
         )
         """
     )
     existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(contacts)")}
-    if "event_id" not in existing_cols:
-        conn.execute("ALTER TABLE contacts ADD COLUMN event_id TEXT")
+    for col, coltype in (
+        ("event_id", "TEXT"),
+        ("address", "TEXT"),
+        ("latitude", "REAL"),
+        ("longitude", "REAL"),
+        ("location_accuracy", "REAL"),
+    ):
+        if col not in existing_cols:
+            conn.execute(f"ALTER TABLE contacts ADD COLUMN {col} {coltype}")
     return conn
 
 
@@ -126,6 +137,12 @@ def action_save():
     existing = conn.execute("SELECT id FROM contacts WHERE id=?", (contact_id,)).fetchone()
     created_at = payload.get("created_at") or datetime.now(timezone.utc).isoformat()
 
+    def as_float(value):
+        try:
+            return float(value) if value not in (None, "") else None
+        except (TypeError, ValueError):
+            return None
+
     fields = (
         contact_id,
         event_id,
@@ -134,24 +151,30 @@ def action_save():
         payload.get("position", ""),
         payload.get("phone", ""),
         payload.get("email", ""),
+        payload.get("address", ""),
         payload.get("topic", ""),
         payload.get("notes", ""),
         payload.get("priority", "normal"),
         payload.get("photo", ""),
+        as_float(payload.get("latitude")),
+        as_float(payload.get("longitude")),
+        as_float(payload.get("location_accuracy")),
         created_at,
     )
 
     if existing:
         conn.execute(
             """UPDATE contacts SET event_id=?, name=?, company=?, position=?, phone=?, email=?,
-               topic=?, notes=?, priority=?, photo=? WHERE id=?""",
-            fields[1:11] + (contact_id,),
+               address=?, topic=?, notes=?, priority=?, photo=?, latitude=?, longitude=?,
+               location_accuracy=? WHERE id=?""",
+            fields[1:15] + (contact_id,),
         )
     else:
         conn.execute(
             """INSERT INTO contacts
-               (id, event_id, name, company, position, phone, email, topic, notes, priority, photo, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+               (id, event_id, name, company, position, phone, email, address, topic, notes,
+                priority, photo, latitude, longitude, location_accuracy, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             fields,
         )
     conn.commit()
@@ -205,8 +228,8 @@ def action_export_csv(params):
     rows = fetch_contacts_for_export(params)
     buf = io.StringIO()
     fieldnames = [
-        "name", "company", "position", "phone", "email",
-        "topic", "notes", "priority", "created_at",
+        "name", "company", "position", "phone", "email", "address",
+        "topic", "notes", "priority", "latitude", "longitude", "created_at",
     ]
     writer = csv.DictWriter(buf, fieldnames=fieldnames)
     writer.writeheader()
@@ -240,6 +263,10 @@ def action_export_vcf(params):
             lines.append(f"TEL;TYPE=CELL:{vcard_escape(r['phone'])}")
         if r["email"]:
             lines.append(f"EMAIL:{vcard_escape(r['email'])}")
+        if r["address"]:
+            lines.append(f"ADR;TYPE=WORK:;;{vcard_escape(r['address'])};;;;")
+        if r["latitude"] is not None and r["longitude"] is not None:
+            lines.append(f"GEO:{r['latitude']};{r['longitude']}")
         if note_text:
             lines.append(f"NOTE:{vcard_escape(note_text)}")
         lines.append("END:VCARD")

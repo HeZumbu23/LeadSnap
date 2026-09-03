@@ -180,6 +180,19 @@ main{padding:12px 12px 90px 12px;max-width:640px;margin:0 auto;}
 .card-thumb-placeholder svg{width:26px;height:26px;color:var(--text-dim);}
 .priority-star{color:var(--warn);}
 
+.sync-bar{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 16px;font-size:0.78rem;color:var(--text-dim);
+  background:var(--surface-2);border-bottom:1px solid var(--border);
+  max-width:640px;margin:0 auto;
+}
+.sync-dot{
+  width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0;
+}
+.sync-bar.offline .sync-dot{background:var(--danger);}
+.sync-bar.syncing .sync-dot{background:var(--warn);animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.35;}}
+
 .no-event-banner{
   text-align:center;background:var(--surface);border:1px dashed var(--border);
   border-radius:var(--radius);padding:24px 16px;margin-bottom:16px;color:var(--text-dim);

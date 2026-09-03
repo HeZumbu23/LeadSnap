@@ -19,12 +19,13 @@ EXTRACT_PROMPT = (
     "Das Bild zeigt eine Visitenkarte. Extrahiere die Kontaktdaten und "
     "antworte AUSSCHLIESSLICH mit einem einzigen JSON-Objekt (keine "
     "Erklaerung, kein Markdown, kein Codeblock) mit genau diesen Feldern:\n"
-    '{"name": "", "company": "", "position": "", "phone": "", "email": ""}\n'
+    '{"name": "", "company": "", "position": "", "phone": "", "email": "", "address": ""}\n'
     "Regeln: name = vollstaendiger Personenname. company = Firmenname. "
     "position = Jobtitel/Rolle falls erkennbar. phone = die wichtigste "
     "Telefonnummer (bevorzugt Mobil), so wie gedruckt. email = die "
-    "E-Mail-Adresse. Ist ein Feld nicht erkennbar, gib einen leeren "
-    "String zurueck. Erfinde keine Daten."
+    "E-Mail-Adresse. address = die vollstaendige Postadresse der Firma "
+    "(Strasse, PLZ, Ort), so wie gedruckt, in einer Zeile. Ist ein Feld "
+    "nicht erkennbar, gib einen leeren String zurueck. Erfinde keine Daten."
 )
 
 
@@ -160,6 +161,7 @@ def action_extract():
         "position": str(fields.get("position") or "").strip(),
         "phone": str(fields.get("phone") or "").strip(),
         "email": str(fields.get("email") or "").strip(),
+        "address": str(fields.get("address") or "").strip(),
     }
     log("INFO", f"extracted card data for '{data.get('name') or 'unknown'}'")
     send(200, {"ok": True, "fields": data})
