@@ -49,15 +49,18 @@ def read_json_body():
     return json.loads(raw.decode("utf-8"))
 
 
+def default_tenant_name(email):
+    domain = email.split("@")[-1] if "@" in email else ""
+    root = domain.split(".")[0] if domain else ""
+    return root.capitalize() if root else "Mein Team"
+
+
 def action_register():
     payload = read_json_body()
-    tenant_name = (payload.get("tenant_name") or "").strip()
     email = auth_lib.normalize_email(payload.get("email"))
     password = payload.get("password") or ""
+    tenant_name = (payload.get("tenant_name") or "").strip() or default_tenant_name(email)
 
-    if not tenant_name:
-        send(400, {"ok": False, "error": "Firmenname / Messeteam-Name ist erforderlich."})
-        return
     if not auth_lib.valid_email(email):
         send(400, {"ok": False, "error": "Bitte eine gültige E-Mail-Adresse angeben."})
         return

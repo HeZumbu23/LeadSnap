@@ -937,7 +937,6 @@
   document.getElementById("registerForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     document.getElementById("registerError").classList.add("hidden");
-    const tenant_name = document.getElementById("register_tenant").value.trim();
     const email = document.getElementById("register_email").value.trim();
     const password = document.getElementById("register_password").value;
     const btn = e.target.querySelector('button[type="submit"]');
@@ -946,7 +945,7 @@
       const res = await authApi("register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tenant_name, email, password }),
+        body: JSON.stringify({ email, password }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
