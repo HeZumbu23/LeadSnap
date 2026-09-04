@@ -9,6 +9,9 @@
   const TENANT_KEY = "leadsnap_tenant_id";
   const LAST_SESSION_KEY = "leadsnap_last_session";
   const DB = window.LeadSnapDB;
+  const I18N = window.LeadSnapI18N;
+  const t = I18N.t;
+  const terr = (msg) => I18N.translateBackendError(msg);
 
   const views = {
     listView: document.getElementById("listView"),
@@ -28,6 +31,7 @@
   let currentLocation = null; // {latitude, longitude, accuracy}
   let currentCapturedAt = "";
   let syncing = false;
+  let lastSession = null;
 
   function uuid() {
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -54,7 +58,7 @@
 
   function updateEventUi() {
     const ev = currentEvent();
-    const name = ev ? ev.name : "Messe wählen";
+    const name = ev ? ev.name : t("header.chooseEvent");
     document.getElementById("currentEventName").textContent = name;
     document.getElementById("exportEventName").textContent = ev ? ev.name : "–";
     document.getElementById("noEventBanner").classList.toggle("hidden", !!ev);
@@ -78,20 +82,22 @@
     bar.classList.remove("offline", "syncing");
     if (!navigator.onLine) {
       bar.classList.add("offline");
-      text.textContent = pending > 0 ? `Offline – ${pending} Änderung${pending === 1 ? "" : "en"} warten` : "Offline";
+      text.textContent = pending > 0
+        ? t(pending === 1 ? "sync.offlinePending" : "sync.offlinePendingPlural", { n: pending })
+        : t("sync.offline");
     } else if (syncing) {
       bar.classList.add("syncing");
-      text.textContent = "Synchronisiere…";
+      text.textContent = t("sync.syncing");
     } else if (pending > 0) {
-      text.textContent = `Online – ${pending} Änderung${pending === 1 ? "" : "en"} werden übertragen`;
+      text.textContent = t(pending === 1 ? "sync.onlinePending" : "sync.onlinePendingPlural", { n: pending });
     } else {
-      text.textContent = "Online – alles synchronisiert";
+      text.textContent = t("sync.allSynced");
     }
     const hint = document.getElementById("exportSyncHint");
     if (hint) {
       hint.innerHTML = pending > 0
-        ? `<strong>${pending}</strong> lokale Änderung${pending === 1 ? "" : "en"} noch nicht mit dem Server synchronisiert.`
-        : "Alle Daten sind mit dem Server synchronisiert.";
+        ? t(pending === 1 ? "export.pendingSingular" : "export.pendingPlural", { n: pending })
+        : t("export.allSynced");
     }
   }
 
@@ -252,7 +258,7 @@
 
   document.getElementById("syncNowBtn").addEventListener("click", () => {
     if (!navigator.onLine) {
-      alert("Kein Internetzugang – die Daten werden automatisch synchronisiert, sobald wieder eine Verbindung besteht.");
+      alert(t("export.offlineSyncAlert"));
       return;
     }
     syncNow();
@@ -281,7 +287,8 @@
         .includes(q);
     });
 
-    document.getElementById("contactCount").textContent = `${contacts.length} Kontakt${contacts.length === 1 ? "" : "e"}`;
+    document.getElementById("contactCount").textContent =
+      t(contacts.length === 1 ? "list.contactCount" : "list.contactCountPlural", { n: contacts.length });
 
     list.innerHTML = "";
     if (filtered.length === 0) {
@@ -289,7 +296,7 @@
       if (contacts.length !== 0 && q) {
         const li = document.createElement("li");
         li.className = "empty-state";
-        li.textContent = "Keine Treffer für: " + filter;
+        li.textContent = t("list.noMatches", { q: filter });
         list.appendChild(li);
       }
       return;
@@ -338,14 +345,14 @@
   function captureLocation() {
     currentLocation = null;
     if (!("geolocation" in navigator)) {
-      setLocationStatus("📍 Standort: von diesem Browser nicht unterstützt");
+      setLocationStatus(t("location.unsupported"));
       return;
     }
     if (window.isSecureContext === false) {
-      setLocationStatus("📍 Standort benötigt eine sichere (HTTPS-)Verbindung");
+      setLocationStatus(t("location.needsHttps"));
       return;
     }
-    setLocationStatus("📍 Standort wird ermittelt… (Berechtigung ggf. im Browser bestätigen)");
+    setLocationStatus(t("location.locating"));
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         currentLocation = {
@@ -353,15 +360,15 @@
           longitude: pos.coords.longitude,
           accuracy: pos.coords.accuracy,
         };
-        setLocationStatus(`📍 Standort erfasst (±${Math.round(pos.coords.accuracy)} m)`);
+        setLocationStatus(t("location.captured", { acc: Math.round(pos.coords.accuracy) }));
       },
       (err) => {
         if (err.code === err.PERMISSION_DENIED) {
-          setLocationStatus("📍 Standort-Zugriff verweigert – bitte in den Website-/Browser-Einstellungen für LeadSnap erlauben");
+          setLocationStatus(t("location.denied"));
         } else if (err.code === err.TIMEOUT) {
-          setLocationStatus("📍 Standort-Ermittlung hat zu lange gedauert");
+          setLocationStatus(t("location.timeout"));
         } else {
-          setLocationStatus("📍 Standort nicht verfügbar");
+          setLocationStatus(t("location.unavailable"));
         }
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
@@ -396,7 +403,7 @@
           longitude: contact.longitude,
           accuracy: contact.location_accuracy,
         };
-        setLocationStatus(`📍 Standort erfasst${contact.location_accuracy ? ` (±${Math.round(contact.location_accuracy)} m)` : ""}`);
+        setLocationStatus(t("location.captured", { acc: contact.location_accuracy ? Math.round(contact.location_accuracy) : "?" }));
       }
       document.getElementById("f_name").value = contact.name || "";
       document.getElementById("f_company").value = contact.company || "";
@@ -474,10 +481,10 @@
 
   async function extractCardData(photoDataUrl) {
     if (!navigator.onLine) {
-      setExtractStatus("error", "Offline – automatische Erkennung nicht möglich. Bitte manuell eingeben.");
+      setExtractStatus("error", t("extract.offline"));
       return;
     }
-    setExtractStatus("loading", "Visitenkarte wird per KI ausgelesen…");
+    setExtractStatus("loading", t("extract.analyzing"));
     try {
       const res = await fetch(`${EXTRACT_API}?action=extract`, {
         method: "POST",
@@ -486,7 +493,7 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
-        throw new Error(data.error || `HTTP ${res.status}`);
+        throw new Error(terr(data.error) || `HTTP ${res.status}`);
       }
       const f = data.fields || {};
       fillIfEmpty("f_name", f.name);
@@ -495,14 +502,11 @@
       fillIfEmpty("f_phone", f.phone);
       fillIfEmpty("f_email", f.email);
       fillIfEmpty("f_address", f.address);
-      setExtractStatus("success", "Daten erkannt – bitte prüfen.");
+      setExtractStatus("success", t("extract.success"));
       setTimeout(clearExtractStatus, 4000);
     } catch (err) {
       console.error(err);
-      setExtractStatus(
-        "error",
-        `Automatische Erkennung fehlgeschlagen (${err.message}) – bitte manuell eingeben.`
-      );
+      setExtractStatus("error", t("extract.failed", { msg: err.message }));
     }
   }
 
@@ -522,7 +526,7 @@
       extractCardData(currentPhoto);
       document.getElementById("f_topic").focus();
     } catch (err) {
-      alert("Foto konnte nicht verarbeitet werden.");
+      alert(t("form.photoError"));
     }
   });
 
@@ -537,7 +541,7 @@
   document.getElementById("contactForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!currentEventId) {
-      alert("Bitte zuerst eine Messe auswählen.");
+      alert(t("form.noEventSelected"));
       return;
     }
     const payload = {
@@ -559,7 +563,7 @@
       location_accuracy: currentLocation ? currentLocation.accuracy : null,
     };
     if (!payload.name) {
-      alert("Bitte mindestens einen Namen eingeben.");
+      alert(t("form.nameMissing"));
       return;
     }
     const submitBtn = e.target.querySelector('button[type="submit"]');
@@ -570,7 +574,7 @@
       await refreshContacts();
       showView("listView");
     } catch (err) {
-      alert("Speichern fehlgeschlagen: " + err.message);
+      alert(t("form.saveFailed", { msg: err.message }));
     } finally {
       submitBtn.disabled = false;
     }
@@ -588,15 +592,15 @@
     const mapsUrl = hasCoords ? `https://www.openstreetmap.org/?mlat=${c.latitude}&mlon=${c.longitude}#map=17/${c.latitude}/${c.longitude}` : "";
     el.innerHTML = `
       ${c.photo ? `<img src="${c.photo}" alt="">` : ""}
-      <div class="detail-row"><span class="k">Name</span><span>${escapeHtml(c.name)} ${priorityFlag(c.priority)}</span></div>
-      ${c.company ? `<div class="detail-row"><span class="k">Firma</span><span>${escapeHtml(c.company)}</span></div>` : ""}
-      ${c.position ? `<div class="detail-row"><span class="k">Position</span><span>${escapeHtml(c.position)}</span></div>` : ""}
-      ${c.phone ? `<div class="detail-row"><span class="k">Telefon</span><span><a href="tel:${escapeHtml(c.phone)}">${escapeHtml(c.phone)}</a></span></div>` : ""}
-      ${c.email ? `<div class="detail-row"><span class="k">E-Mail</span><span><a href="mailto:${escapeHtml(c.email)}">${escapeHtml(c.email)}</a></span></div>` : ""}
-      ${c.address ? `<div class="detail-row"><span class="k">Adresse</span><span>${escapeHtml(c.address)}</span></div>` : ""}
-      ${c.topic ? `<div class="detail-row"><span class="k">Thema</span><span>${escapeHtml(c.topic)}</span></div>` : ""}
-      ${created ? `<div class="detail-row"><span class="k">Erfasst</span><span>${created}</span></div>` : ""}
-      ${hasCoords ? `<div class="detail-row"><span class="k">Standort</span><span><a href="${mapsUrl}" target="_blank" rel="noopener">Karte öffnen${c.location_accuracy ? ` (±${Math.round(c.location_accuracy)} m)` : ""}</a></span></div>` : ""}
+      <div class="detail-row"><span class="k">${t("detail.name")}</span><span>${escapeHtml(c.name)} ${priorityFlag(c.priority)}</span></div>
+      ${c.company ? `<div class="detail-row"><span class="k">${t("detail.company")}</span><span>${escapeHtml(c.company)}</span></div>` : ""}
+      ${c.position ? `<div class="detail-row"><span class="k">${t("detail.position")}</span><span>${escapeHtml(c.position)}</span></div>` : ""}
+      ${c.phone ? `<div class="detail-row"><span class="k">${t("detail.phone")}</span><span><a href="tel:${escapeHtml(c.phone)}">${escapeHtml(c.phone)}</a></span></div>` : ""}
+      ${c.email ? `<div class="detail-row"><span class="k">${t("detail.email")}</span><span><a href="mailto:${escapeHtml(c.email)}">${escapeHtml(c.email)}</a></span></div>` : ""}
+      ${c.address ? `<div class="detail-row"><span class="k">${t("detail.address")}</span><span>${escapeHtml(c.address)}</span></div>` : ""}
+      ${c.topic ? `<div class="detail-row"><span class="k">${t("detail.topic")}</span><span>${escapeHtml(c.topic)}</span></div>` : ""}
+      ${created ? `<div class="detail-row"><span class="k">${t("detail.captured")}</span><span>${created}</span></div>` : ""}
+      ${hasCoords ? `<div class="detail-row"><span class="k">${t("detail.location")}</span><span><a href="${mapsUrl}" target="_blank" rel="noopener">${t("detail.openMap")}${c.location_accuracy ? ` (±${Math.round(c.location_accuracy)} m)` : ""}</a></span></div>` : ""}
       ${c.notes ? `<div class="detail-notes">${escapeHtml(c.notes)}</div>` : ""}
     `;
     showView("detailView");
@@ -608,14 +612,14 @@
   });
 
   document.getElementById("detailDeleteBtn").addEventListener("click", async () => {
-    if (!confirm("Diesen Kontakt wirklich löschen?")) return;
+    if (!confirm(t("detail.confirmDelete"))) return;
     try {
       await DB.del("contacts", currentDetailId);
       await queueChange("contact", "delete", { id: currentDetailId });
       await refreshContacts();
       showView("listView");
     } catch (err) {
-      alert("Löschen fehlgeschlagen: " + err.message);
+      alert(t("detail.deleteFailed", { msg: err.message }));
     }
   });
 
@@ -640,7 +644,7 @@
 
   function requireEvent() {
     if (!currentEventId) {
-      alert("Bitte zuerst eine Messe auswählen.");
+      alert(t("form.noEventSelected"));
       return false;
     }
     return true;
@@ -648,7 +652,7 @@
 
   function requireOnlineExport() {
     if (!navigator.onLine) {
-      alert("Für den Server-Export wird eine Internetverbindung benötigt. Nutze in der Zwischenzeit das JSON-Backup, das auch offline funktioniert.");
+      alert(t("export.offlineExport"));
       return false;
     }
     return true;
@@ -680,13 +684,13 @@
   });
   document.getElementById("clearAllBtn").addEventListener("click", async () => {
     if (!requireEvent()) return;
-    if (!confirm(`Wirklich ALLE Kontakte von "${currentEvent()?.name}" unwiderruflich löschen?`)) return;
+    if (!confirm(t("export.confirmClearAll", { name: currentEvent()?.name }))) return;
     try {
       await DB.clearByEventId("contacts", currentEventId);
       await queueChange("contact", "clear_all", { event_id: currentEventId });
       await refreshContacts();
     } catch (err) {
-      alert("Fehler: " + err.message);
+      alert(t("common.error", { msg: err.message }));
     }
   });
 
@@ -706,7 +710,7 @@
     if (events.length === 0) {
       const li = document.createElement("li");
       li.className = "empty-state";
-      li.textContent = "Noch keine Messe angelegt.";
+      li.textContent = t("events.none");
       list.appendChild(li);
       return;
     }
@@ -719,15 +723,15 @@
           <div class="event-card-name">${escapeHtml(ev.name)}</div>
           ${meta ? `<div class="event-card-meta">${escapeHtml(meta)}</div>` : ""}
         </div>
-        ${ev.id === currentEventId ? '<span class="active-badge">Aktiv</span>' : ""}
+        ${ev.id === currentEventId ? `<span class="active-badge">${t("events.active")}</span>` : ""}
         <div class="event-card-actions">
-          <button type="button" data-act="edit" title="Bearbeiten">
+          <button type="button" data-act="edit" title="${t("events.edit")}">
             <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
           </button>
-          <button type="button" data-act="archive" title="${ev.archived ? "Reaktivieren" : "Archivieren"}">
+          <button type="button" data-act="archive" title="${ev.archived ? t("events.reactivate") : t("events.archive")}">
             <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4"/></svg>
           </button>
-          <button type="button" data-act="delete" title="Löschen">
+          <button type="button" data-act="delete" title="${t("events.delete")}">
             <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>
           </button>
         </div>
@@ -751,12 +755,12 @@
           await queueChange("event", "update", updated);
           await refreshEvents();
         } catch (err) {
-          alert("Fehler: " + err.message);
+          alert(t("common.error", { msg: err.message }));
         }
       });
       li.querySelector('[data-act="delete"]').addEventListener("click", async (e) => {
         e.stopPropagation();
-        if (!confirm(`"${ev.name}" inklusive aller zugehörigen Kontakte wirklich löschen?`)) return;
+        if (!confirm(t("events.confirmDelete", { name: ev.name }))) return;
         try {
           await DB.del("events", ev.id);
           await DB.clearByEventId("contacts", ev.id);
@@ -766,7 +770,7 @@
             await refreshContacts();
           }
         } catch (err) {
-          alert("Fehler: " + err.message);
+          alert(t("common.error", { msg: err.message }));
         }
       });
       list.appendChild(li);
@@ -816,7 +820,7 @@
         await refreshContacts();
       }
     } catch (err) {
-      alert("Speichern fehlgeschlagen: " + err.message);
+      alert(t("events.saveFailed", { msg: err.message }));
     }
   });
 
@@ -891,11 +895,12 @@
 
   async function startApp(session) {
     sessionExpiredShown = false;
+    lastSession = session;
     localStorage.setItem(LAST_SESSION_KEY, JSON.stringify({
       email: session.email, tenant_id: session.tenant_id, tenant_name: session.tenant_name,
     }));
     document.getElementById("accountHint").textContent =
-      `Angemeldet als ${session.email} (${session.tenant_name})`;
+      t("export.accountHint", { email: session.email, tenant: session.tenant_name });
     await resetLocalTenantScopeIfNeeded(session.tenant_id);
     showApp();
     await refreshEvents();
@@ -934,7 +939,7 @@
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (!res.ok || !data.ok) throw new Error(terr(data.error) || t("err.apiGeneric", { status: res.status }));
       const session = await fetchSession();
       if (session && session.ok) await startApp(session);
     } catch (err) {
@@ -958,7 +963,7 @@
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (!res.ok || !data.ok) throw new Error(terr(data.error) || t("err.apiGeneric", { status: res.status }));
       const session = await fetchSession();
       if (session && session.ok) await startApp(session);
     } catch (err) {
@@ -969,7 +974,7 @@
   });
 
   document.getElementById("logoutBtn").addEventListener("click", async () => {
-    if (!confirm("Wirklich abmelden?")) return;
+    if (!confirm(t("export.confirmLogout"))) return;
     try {
       await authApi("logout", { method: "POST" });
     } catch (err) {
@@ -983,6 +988,28 @@
     events = [];
     contacts = [];
     showAuth();
+  });
+
+  // ---- Language switcher ----
+
+  I18N.applyStatic();
+
+  document.querySelectorAll(".lang-toggle").forEach((btn) => {
+    btn.addEventListener("click", () => I18N.toggle());
+  });
+
+  I18N.onChange(async () => {
+    updateEventUi();
+    renderList(document.getElementById("searchBox").value);
+    renderEventList();
+    await updateSyncBar();
+    if (lastSession) {
+      document.getElementById("accountHint").textContent =
+        t("export.accountHint", { email: lastSession.email, tenant: lastSession.tenant_name });
+    }
+    if (currentDetailId && !views.detailView.classList.contains("hidden")) {
+      openDetail(currentDetailId);
+    }
   });
 
   // ---- Init ----

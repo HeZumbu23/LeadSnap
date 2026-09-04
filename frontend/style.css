@@ -50,6 +50,16 @@ body{
 .brand-logo{width:28px;height:28px;filter:drop-shadow(0 3px 8px rgba(91,61,240,0.35));}
 .count{font-size:0.8rem;color:var(--text-dim);margin-bottom:8px;font-weight:600;}
 
+.topbar-right{display:flex;align-items:center;gap:8px;}
+.lang-toggle{
+  background:var(--surface-2);border:1px solid var(--border);border-radius:10px;
+  padding:7px 10px;font-size:0.78rem;font-weight:800;color:var(--accent-2);
+  cursor:pointer;letter-spacing:0.02em;transition:transform 0.15s;
+}
+.lang-toggle:active{transform:scale(0.92);}
+.auth-card{position:relative;}
+.auth-card .lang-toggle{position:absolute;top:18px;right:18px;}
+
 .event-switcher{
   display:flex;align-items:center;gap:6px;
   background:var(--gradient-soft);border:1px solid rgba(124,92,255,0.28);
