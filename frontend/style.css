@@ -184,6 +184,43 @@ main{padding:12px 12px 90px 12px;max-width:640px;margin:0 auto;}
 .detail-row a{color:var(--accent-2);font-weight:600;text-decoration:none;}
 .detail-notes{margin-top:14px;padding:14px;background:var(--gradient-soft);border-radius:14px;white-space:pre-wrap;font-size:0.95rem;}
 
+.lead-box{
+  margin-top:16px;padding:14px 16px;border-radius:16px;
+  background:var(--gradient-soft);border:1.5px solid rgba(124,92,255,0.3);
+}
+.lead-box .detail-row{border-bottom-color:rgba(124,92,255,0.18);}
+.lead-box .detail-row:last-child{border-bottom:none;}
+.lead-box .detail-notes{background:rgba(255,255,255,0.6);margin-top:10px;}
+
+.map-thumb-wrap{margin-top:12px;border-radius:14px;overflow:hidden;position:relative;cursor:pointer;
+  border:1px solid var(--border);box-shadow:var(--shadow-sm);transition:transform 0.15s;}
+.map-thumb-wrap:active{transform:scale(0.98);}
+.map-thumb{display:block;width:100%;height:130px;object-fit:cover;background:var(--surface-2);}
+.map-thumb-pin{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-100%);
+  width:26px;height:26px;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.35));
+}
+.map-thumb-hint{
+  position:absolute;bottom:8px;right:8px;background:rgba(21,15,51,0.72);color:#fff;
+  font-size:0.7rem;font-weight:700;padding:4px 9px;border-radius:999px;backdrop-filter:blur(4px);
+}
+
+.map-modal{
+  position:fixed;inset:0;z-index:50;background:#150f33;
+  display:flex;flex-direction:column;
+}
+.map-modal.hidden{display:none;}
+.map-modal-frame{flex:1;width:100%;border:none;}
+.map-modal-close{
+  position:absolute;top:calc(14px + env(safe-area-inset-top));right:14px;z-index:2;
+  background:rgba(255,255,255,0.95);
+}
+.map-modal-open{
+  position:absolute;left:14px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:2;
+  background:var(--gradient);color:#fff;font-weight:700;font-size:0.85rem;
+  padding:10px 16px;border-radius:999px;text-decoration:none;box-shadow:var(--shadow-glow);
+}
+
 /* Export view */
 #exportView h2{margin-top:4px;font-weight:800;letter-spacing:-0.02em;}
 .hint{color:var(--text-dim);font-size:0.9rem;margin-bottom:18px;}

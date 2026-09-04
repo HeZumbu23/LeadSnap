@@ -583,6 +583,34 @@
 
   // ---- Detail ----
 
+  function priorityLabel(p) {
+    if (p === "hoch") return t("form.priorityHigh");
+    if (p === "niedrig") return t("form.priorityLow");
+    return "";
+  }
+
+  function mapThumbUrl(lat, lon) {
+    return `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lon}&zoom=16&size=600x260&maptype=mapnik&markers=${lat},${lon},red-pushpin`;
+  }
+
+  function mapEmbedUrl(lat, lon) {
+    const d = 0.006;
+    const bbox = `${lon - d},${lat - d},${lon + d},${lat + d}`;
+    return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lon}`;
+  }
+
+  function openMapModal(lat, lon) {
+    document.getElementById("mapModalFrame").src = mapEmbedUrl(lat, lon);
+    document.getElementById("mapModalOpenLink").href =
+      `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=17/${lat}/${lon}`;
+    document.getElementById("mapModal").classList.remove("hidden");
+  }
+
+  document.getElementById("mapModalClose").addEventListener("click", () => {
+    document.getElementById("mapModal").classList.add("hidden");
+    document.getElementById("mapModalFrame").src = "";
+  });
+
   function openDetail(id) {
     const c = contacts.find((x) => x.id === id);
     if (!c) return;
@@ -590,20 +618,40 @@
     const el = document.getElementById("detailContent");
     const created = c.created_at ? new Date(c.created_at).toLocaleString() : "";
     const hasCoords = c.latitude != null && c.longitude != null;
-    const mapsUrl = hasCoords ? `https://www.openstreetmap.org/?mlat=${c.latitude}&mlon=${c.longitude}#map=17/${c.latitude}/${c.longitude}` : "";
+
+    const leadItems = [];
+    if (c.topic) leadItems.push(`<div class="detail-row"><span class="k">${t("detail.topic")}</span><span>${escapeHtml(c.topic)}</span></div>`);
+    if (c.priority && c.priority !== "normal") {
+      leadItems.push(`<div class="detail-row"><span class="k">${t("form.priority")}</span><span>${priorityFlag(c.priority)} ${priorityLabel(c.priority)}</span></div>`);
+    }
+    const leadBlock = (leadItems.length || c.notes) ? `
+      <div class="lead-box">
+        ${leadItems.join("")}
+        ${c.notes ? `<div class="detail-notes">${escapeHtml(c.notes)}</div>` : ""}
+      </div>
+    ` : "";
+
     el.innerHTML = `
       ${c.photo ? `<img src="${c.photo}" alt="">` : ""}
-      <div class="detail-row"><span class="k">${t("detail.name")}</span><span>${escapeHtml(c.name)} ${priorityFlag(c.priority)}</span></div>
+      <div class="detail-row"><span class="k">${t("detail.name")}</span><span>${escapeHtml(c.name)}</span></div>
       ${c.company ? `<div class="detail-row"><span class="k">${t("detail.company")}</span><span>${escapeHtml(c.company)}</span></div>` : ""}
       ${c.position ? `<div class="detail-row"><span class="k">${t("detail.position")}</span><span>${escapeHtml(c.position)}</span></div>` : ""}
       ${c.phone ? `<div class="detail-row"><span class="k">${t("detail.phone")}</span><span><a href="tel:${escapeHtml(c.phone)}">${escapeHtml(c.phone)}</a></span></div>` : ""}
       ${c.email ? `<div class="detail-row"><span class="k">${t("detail.email")}</span><span><a href="mailto:${escapeHtml(c.email)}">${escapeHtml(c.email)}</a></span></div>` : ""}
       ${c.address ? `<div class="detail-row"><span class="k">${t("detail.address")}</span><span>${escapeHtml(c.address)}</span></div>` : ""}
-      ${c.topic ? `<div class="detail-row"><span class="k">${t("detail.topic")}</span><span>${escapeHtml(c.topic)}</span></div>` : ""}
       ${created ? `<div class="detail-row"><span class="k">${t("detail.captured")}</span><span>${created}</span></div>` : ""}
-      ${hasCoords ? `<div class="detail-row"><span class="k">${t("detail.location")}</span><span><a href="${mapsUrl}" target="_blank" rel="noopener">${t("detail.openMap")}${c.location_accuracy ? ` (±${Math.round(c.location_accuracy)} m)` : ""}</a></span></div>` : ""}
-      ${c.notes ? `<div class="detail-notes">${escapeHtml(c.notes)}</div>` : ""}
+      ${hasCoords ? `
+        <div class="map-thumb-wrap" id="detailMapThumb">
+          <img class="map-thumb" src="${mapThumbUrl(c.latitude, c.longitude)}" alt="${t("detail.location")}" loading="lazy">
+          <div class="map-thumb-hint">${t("detail.openMap")}${c.location_accuracy ? ` (±${Math.round(c.location_accuracy)} m)` : ""}</div>
+        </div>
+      ` : ""}
+      ${leadBlock}
     `;
+
+    if (hasCoords) {
+      document.getElementById("detailMapThumb").addEventListener("click", () => openMapModal(c.latitude, c.longitude));
+    }
     showView("detailView");
   }
 
