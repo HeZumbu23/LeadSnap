@@ -9,13 +9,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="LeadSnap">
-<link rel="manifest" href="manifest.json?v=12">
-<link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=12">
-<link rel="apple-touch-icon" href="icons/icon-192.png?v=12">
+<link rel="manifest" href="manifest.json?v=13">
+<link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=13">
+<link rel="apple-touch-icon" href="icons/icon-192.png?v=13">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
 
@@ -23,7 +23,7 @@
   <div class="auth-card">
     <button type="button" id="authLangToggle" class="lang-toggle" title="Language / Sprache">EN</button>
     <div class="auth-brand">
-      <img src="icons/favicon.svg?v=12" alt="" class="brand-logo">
+      <img src="icons/favicon.svg?v=13" alt="" class="brand-logo">
       <span>LeadSnap</span>
     </div>
 
@@ -65,7 +65,7 @@
 <div id="appShell" class="hidden">
 <header class="topbar">
   <div class="brand">
-    <img src="icons/favicon.svg?v=12" alt="" class="brand-logo">
+    <img src="icons/favicon.svg?v=13" alt="" class="brand-logo">
     <span>LeadSnap</span>
   </div>
   <div class="topbar-right">
@@ -290,9 +290,9 @@
   <a id="mapModalOpenLink" class="map-modal-open" target="_blank" rel="noopener" data-i18n="detail.openInMaps">In Karten-App öffnen</a>
 </div>
 
-<script src="db.js?v=12"></script>
-<script src="i18n.js?v=12"></script>
-<script src="app.js?v=12"></script>
+<script src="db.js?v=13"></script>
+<script src="i18n.js?v=13"></script>
+<script src="app.js?v=13"></script>
 <script>
 fetch("/_manager/cgi-bin/app_status.py?name=leadsnap")
   .then(r => r.json())
@@ -306,7 +306,7 @@ fetch("/_manager/cgi-bin/app_status.py?name=leadsnap")
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js?v=12").catch((err) => {
+    navigator.serviceWorker.register("sw.js?v=13").catch((err) => {
       console.warn("Service worker registration failed:", err);
     });
   });

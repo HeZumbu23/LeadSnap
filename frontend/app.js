@@ -589,13 +589,8 @@
     return "";
   }
 
-  function mapThumbUrl(lat, lon) {
-    return `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lon}&zoom=16&size=600x260&maptype=mapnik&markers=${lat},${lon},red-pushpin`;
-  }
-
-  function mapEmbedUrl(lat, lon) {
-    const d = 0.006;
-    const bbox = `${lon - d},${lat - d},${lon + d},${lat + d}`;
+  function mapEmbedUrl(lat, lon, delta = 0.006) {
+    const bbox = `${lon - delta},${lat - delta},${lon + delta},${lat + delta}`;
     return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lon}`;
   }
 
@@ -623,17 +618,18 @@
     const created = c.created_at ? new Date(c.created_at).toLocaleString() : "";
     const hasCoords = c.latitude != null && c.longitude != null;
 
+    // Topic/priority/notes are the actual sales-lead info reps act on, so
+    // this box always renders (priority always has a value) rather than
+    // disappearing whenever priority happens to be "normal".
     const leadItems = [];
-    if (c.topic) leadItems.push(`<div class="detail-row"><span class="k">${t("detail.topic")}</span><span>${escapeHtml(c.topic)}</span></div>`);
-    if (c.priority && c.priority !== "normal") {
-      leadItems.push(`<div class="detail-row"><span class="k">${t("form.priority")}</span><span>${priorityFlag(c.priority)} ${priorityLabel(c.priority)}</span></div>`);
-    }
-    const leadBlock = (leadItems.length || c.notes) ? `
+    leadItems.push(`<div class="detail-row"><span class="k">${t("form.topic")}</span><span>${c.topic ? escapeHtml(c.topic) : "–"}</span></div>`);
+    leadItems.push(`<div class="detail-row"><span class="k">${t("form.priority")}</span><span>${priorityFlag(c.priority) || ""} ${priorityLabel(c.priority) || t("form.priorityNormal")}</span></div>`);
+    const leadBlock = `
       <div class="lead-box">
         ${leadItems.join("")}
         ${c.notes ? `<div class="detail-notes">${escapeHtml(c.notes)}</div>` : ""}
       </div>
-    ` : "";
+    `;
 
     el.innerHTML = `
       ${c.photo ? `<img src="${c.photo}" alt="">` : ""}
@@ -646,7 +642,8 @@
       ${created ? `<div class="detail-row"><span class="k">${t("detail.captured")}</span><span>${created}</span></div>` : ""}
       ${hasCoords ? `
         <div class="map-thumb-wrap" id="detailMapThumb">
-          <img class="map-thumb" src="${mapThumbUrl(c.latitude, c.longitude)}" alt="${t("detail.location")}" loading="lazy">
+          <iframe class="map-thumb" src="${mapEmbedUrl(c.latitude, c.longitude, 0.003)}" loading="lazy" tabindex="-1" title="${t("detail.location")}"></iframe>
+          <div class="map-thumb-overlay"></div>
           <div class="map-thumb-hint">${t("detail.openMap")}${c.location_accuracy ? ` (±${Math.round(c.location_accuracy)} m)` : ""}</div>
         </div>
       ` : ""}
