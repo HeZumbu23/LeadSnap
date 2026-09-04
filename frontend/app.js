@@ -658,13 +658,12 @@
     }
     const addressLink = document.getElementById("detailAddressLink");
     if (addressLink) {
+      // Always resolve the address itself (Google Maps search) here - the
+      // captured GPS coords are where the rep stood, not the company's
+      // address, so they must not be reused for this link.
       addressLink.addEventListener("click", (e) => {
         e.preventDefault();
-        if (hasCoords) {
-          openMapModal(c.latitude, c.longitude);
-        } else {
-          openAddressSearch(c.address);
-        }
+        openAddressSearch(c.address);
       });
     }
     showView("detailView");
