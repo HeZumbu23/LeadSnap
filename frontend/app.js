@@ -19,6 +19,7 @@
     detailView: document.getElementById("detailView"),
     exportView: document.getElementById("exportView"),
     eventView: document.getElementById("eventView"),
+    adminView: document.getElementById("adminView"),
   };
 
   let contacts = [];
@@ -843,8 +844,57 @@
   document.getElementById("fabAdd").addEventListener("click", () => openForm());
 
   document.querySelectorAll(".navbtn").forEach((btn) => {
-    btn.addEventListener("click", () => showView(btn.dataset.view));
+    btn.addEventListener("click", () => {
+      showView(btn.dataset.view);
+      if (btn.dataset.view === "adminView") loadAdminStats();
+    });
   });
+
+  // ---- Admin backend tab ----
+
+  const ADMIN_API = "cgi-bin/admin.py";
+
+  async function loadAdminStats() {
+    try {
+      const res = await fetch(`${ADMIN_API}?action=stats`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        throw new Error(terr(data.error) || t("err.apiGeneric", { status: res.status }));
+      }
+      renderAdminStats(data);
+    } catch (err) {
+      alert(t("admin.loadFailed", { msg: err.message }));
+    }
+  }
+
+  function renderAdminStats(data) {
+    document.getElementById("statTenants").textContent = data.totals.tenants;
+    document.getElementById("statUsers").textContent = data.totals.users;
+    document.getElementById("statEvents").textContent = data.totals.events;
+    document.getElementById("statContacts").textContent = data.totals.contacts;
+
+    const list = document.getElementById("adminTenantList");
+    list.innerHTML = "";
+    data.tenants.forEach((tn) => {
+      const li = document.createElement("li");
+      li.className = "event-card";
+      const created = tn.created_at ? new Date(tn.created_at).toLocaleDateString() : "";
+      li.innerHTML = `
+        <div class="event-card-body">
+          <div class="event-card-name">${escapeHtml(tn.name)}</div>
+          <div class="admin-tenant-meta">
+            <span>${t("admin.users")}: ${tn.user_count}</span>
+            <span>${t("admin.events")}: ${tn.event_count}</span>
+            <span>${t("admin.contacts")}: ${tn.contact_count}</span>
+            ${created ? `<span>${t("admin.createdAt", { date: created })}</span>` : ""}
+          </div>
+        </div>
+      `;
+      list.appendChild(li);
+    });
+  }
+
+  document.getElementById("adminRefreshBtn").addEventListener("click", loadAdminStats);
 
   document.getElementById("searchBox").addEventListener("input", (e) => {
     renderList(e.target.value);
@@ -898,9 +948,11 @@
     lastSession = session;
     localStorage.setItem(LAST_SESSION_KEY, JSON.stringify({
       email: session.email, tenant_id: session.tenant_id, tenant_name: session.tenant_name,
+      is_admin: !!session.is_admin,
     }));
     document.getElementById("accountHint").textContent =
       t("export.accountHint", { email: session.email, tenant: session.tenant_name });
+    document.getElementById("adminNavBtn").classList.toggle("hidden", !session.is_admin);
     await resetLocalTenantScopeIfNeeded(session.tenant_id);
     showApp();
     await refreshEvents();

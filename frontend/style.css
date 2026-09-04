@@ -315,6 +315,16 @@ main{padding:12px 12px 90px 12px;max-width:640px;margin:0 auto;}
   border-radius:999px;padding:3px 10px;flex-shrink:0;letter-spacing:0.02em;
 }
 
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;}
+.stat-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px;text-align:center;box-shadow:var(--shadow-sm);
+}
+.stat-value{font-size:1.8rem;font-weight:800;background:var(--gradient);-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:-0.02em;}
+.stat-label{font-size:0.78rem;color:var(--text-dim);font-weight:700;text-transform:uppercase;letter-spacing:0.03em;margin-top:2px;}
+#adminView h3{margin:22px 0 10px 0;font-size:1rem;font-weight:800;}
+.admin-tenant-meta{font-size:0.8rem;color:var(--text-dim);display:flex;gap:12px;flex-wrap:wrap;margin-top:2px;}
+
 #eventForm{margin-top:16px;border-top:1px solid var(--border);padding-top:16px;}
 #eventForm .field-grid{display:flex;gap:12px;margin-top:12px;}
 #eventForm .field-grid .field{flex:1;}

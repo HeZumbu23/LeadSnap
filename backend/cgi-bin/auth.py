@@ -157,6 +157,7 @@ def action_me():
         "email": session["email"],
         "tenant_id": session["tenant_id"],
         "tenant_name": tenant["name"] if tenant else "",
+        "is_admin": auth_lib.is_admin(session["email"]),
     })
 
 

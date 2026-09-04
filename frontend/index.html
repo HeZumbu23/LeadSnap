@@ -9,13 +9,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="LeadSnap">
-<link rel="manifest" href="manifest.json?v=8">
-<link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=8">
-<link rel="apple-touch-icon" href="icons/icon-192.png?v=8">
+<link rel="manifest" href="manifest.json?v=9">
+<link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=9">
+<link rel="apple-touch-icon" href="icons/icon-192.png?v=9">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 
@@ -23,7 +23,7 @@
   <div class="auth-card">
     <button type="button" id="authLangToggle" class="lang-toggle" title="Language / Sprache">EN</button>
     <div class="auth-brand">
-      <img src="icons/favicon.svg?v=8" alt="" class="brand-logo">
+      <img src="icons/favicon.svg?v=9" alt="" class="brand-logo">
       <span>LeadSnap</span>
     </div>
 
@@ -65,7 +65,7 @@
 <div id="appShell" class="hidden">
 <header class="topbar">
   <div class="brand">
-    <img src="icons/favicon.svg?v=8" alt="" class="brand-logo">
+    <img src="icons/favicon.svg?v=9" alt="" class="brand-logo">
     <span>LeadSnap</span>
   </div>
   <div class="topbar-right">
@@ -229,6 +229,35 @@
     </form>
   </section>
 
+  <section id="adminView" class="hidden">
+    <h2 data-i18n="admin.title">Backend</h2>
+    <p class="hint" data-i18n="admin.hint">Plattformweite Statistik über alle Teams.</p>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="statTenants">–</div>
+        <div class="stat-label" data-i18n="admin.tenants">Teams</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statUsers">–</div>
+        <div class="stat-label" data-i18n="admin.users">Nutzer</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statEvents">–</div>
+        <div class="stat-label" data-i18n="admin.events">Messen</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statContacts">–</div>
+        <div class="stat-label" data-i18n="admin.contacts">Kontakte</div>
+      </div>
+    </div>
+
+    <button class="btn secondary wide" id="adminRefreshBtn" data-i18n="admin.refresh">Aktualisieren</button>
+
+    <h3 data-i18n="admin.byTenant">Nach Team</h3>
+    <ul id="adminTenantList" class="event-list"></ul>
+  </section>
+
 </main>
 
 <button id="fabAdd" class="fab" data-i18n-title="header.newContact" title="Neuer Kontakt">
@@ -244,14 +273,18 @@
     <svg viewBox="0 0 24 24" class="icon" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>
     <span data-i18n="nav.export">Export</span>
   </button>
+  <button class="navbtn hidden" id="adminNavBtn" data-view="adminView">
+    <svg viewBox="0 0 24 24" class="icon" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5a1 1 0 0 1 1-1h9l5 5v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1Z"/><path d="M14 4v4a1 1 0 0 0 1 1h4M9 13h6M9 16.5h6"/></svg>
+    <span data-i18n="nav.admin">Backend</span>
+  </button>
 </nav>
 
 <div id="footer" class="deploy-footer"></div>
 </div>
 
-<script src="db.js?v=8"></script>
-<script src="i18n.js?v=8"></script>
-<script src="app.js?v=8"></script>
+<script src="db.js?v=9"></script>
+<script src="i18n.js?v=9"></script>
+<script src="app.js?v=9"></script>
 <script>
 fetch("/_manager/cgi-bin/app_status.py?name=leadsnap")
   .then(r => r.json())
@@ -265,7 +298,7 @@ fetch("/_manager/cgi-bin/app_status.py?name=leadsnap")
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js?v=8").catch((err) => {
+    navigator.serviceWorker.register("sw.js?v=9").catch((err) => {
       console.warn("Service worker registration failed:", err);
     });
   });

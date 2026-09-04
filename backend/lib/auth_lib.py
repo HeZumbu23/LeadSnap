@@ -15,6 +15,15 @@ COOKIE_NAME = "leadsnap_session"
 SESSION_TTL_DAYS = 30
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
+# Hardcoded superuser account with cross-tenant read access to platform
+# stats (backend/cgi-bin/admin.py). Not a tenant role - this is checked by
+# email regardless of which tenant the account belongs to.
+ADMIN_EMAILS = {"s1@kerchmail.de"}
+
+
+def is_admin(email):
+    return normalize_email(email) in ADMIN_EMAILS
+
 
 def data_dir():
     return os.environ.get("APP_DATA_DIR", ".")
