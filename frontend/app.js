@@ -606,6 +606,10 @@
     document.getElementById("mapModal").classList.remove("hidden");
   }
 
+  function openAddressSearch(address) {
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, "_blank", "noopener");
+  }
+
   document.getElementById("mapModalClose").addEventListener("click", () => {
     document.getElementById("mapModal").classList.add("hidden");
     document.getElementById("mapModalFrame").src = "";
@@ -638,7 +642,7 @@
       ${c.position ? `<div class="detail-row"><span class="k">${t("detail.position")}</span><span>${escapeHtml(c.position)}</span></div>` : ""}
       ${c.phone ? `<div class="detail-row"><span class="k">${t("detail.phone")}</span><span><a href="tel:${escapeHtml(c.phone)}">${escapeHtml(c.phone)}</a></span></div>` : ""}
       ${c.email ? `<div class="detail-row"><span class="k">${t("detail.email")}</span><span><a href="mailto:${escapeHtml(c.email)}">${escapeHtml(c.email)}</a></span></div>` : ""}
-      ${c.address ? `<div class="detail-row"><span class="k">${t("detail.address")}</span><span>${escapeHtml(c.address)}</span></div>` : ""}
+      ${c.address ? `<div class="detail-row"><span class="k">${t("detail.address")}</span><span><a href="#" id="detailAddressLink">${escapeHtml(c.address)}</a></span></div>` : ""}
       ${created ? `<div class="detail-row"><span class="k">${t("detail.captured")}</span><span>${created}</span></div>` : ""}
       ${hasCoords ? `
         <div class="map-thumb-wrap" id="detailMapThumb">
@@ -651,6 +655,17 @@
 
     if (hasCoords) {
       document.getElementById("detailMapThumb").addEventListener("click", () => openMapModal(c.latitude, c.longitude));
+    }
+    const addressLink = document.getElementById("detailAddressLink");
+    if (addressLink) {
+      addressLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (hasCoords) {
+          openMapModal(c.latitude, c.longitude);
+        } else {
+          openAddressSearch(c.address);
+        }
+      });
     }
     showView("detailView");
   }
