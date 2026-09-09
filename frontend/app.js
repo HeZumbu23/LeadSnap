@@ -686,9 +686,12 @@
   // ---- Export ----
 
   function downloadFrom(url, filename) {
+    // No target="_blank" here: the server already forces a download via
+    // Content-Disposition: attachment, so opening a new tab just leaves a
+    // confusing blank/white tab behind while the file downloads unseen.
     const a = document.createElement("a");
     a.href = url;
-    a.target = "_blank";
+    a.download = filename;
     a.rel = "noopener";
     document.body.appendChild(a);
     a.click();
