@@ -859,6 +859,16 @@
   document.getElementById("addEventBtn").addEventListener("click", () => openEventForm());
   document.getElementById("eventFormCancelBtn").addEventListener("click", closeEventForm);
 
+  document.getElementById("ev_start").addEventListener("change", (e) => {
+    const endInput = document.getElementById("ev_end");
+    // Default the end date to the start date (instead of staying empty,
+    // which browsers otherwise render as "today") unless it was already
+    // set to something on/after the new start date.
+    if (!endInput.value || endInput.value < e.target.value) {
+      endInput.value = e.target.value;
+    }
+  });
+
   document.getElementById("eventForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const name = document.getElementById("ev_name").value.trim();

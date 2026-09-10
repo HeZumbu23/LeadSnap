@@ -1,16 +1,16 @@
-const CACHE_NAME = "leadsnap-shell-v14";
+const CACHE_NAME = "leadsnap-shell-v15";
 
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./style.css?v=14",
-  "./db.js?v=14",
-  "./i18n.js?v=14",
-  "./app.js?v=14",
-  "./manifest.json?v=14",
-  "./icons/favicon.svg?v=14",
-  "./icons/icon-192.png?v=14",
-  "./icons/icon-512.png?v=14",
+  "./style.css?v=15",
+  "./db.js?v=15",
+  "./i18n.js?v=15",
+  "./app.js?v=15",
+  "./manifest.json?v=15",
+  "./icons/favicon.svg?v=15",
+  "./icons/icon-192.png?v=15",
+  "./icons/icon-512.png?v=15",
 ];
 
 self.addEventListener("install", (event) => {
